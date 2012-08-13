@@ -1,7 +1,17 @@
 /*jslint plusplus: true, white: true, nomen: true */
 /*global define */
 
-define(['./parser', './list'], function(parser, list){
+define([
+	'./parser',
+	'./tclobject',
+	'./list',
+
+	'./objtype_list'
+], function(
+	parser,
+	tclobj,
+	list
+){
 "use strict";
 
 function TclError(message) {
@@ -59,7 +69,7 @@ return function(){
 			throw new TclError('can\'t set "'+varname+'": variable is array',
 				'TCL', 'WRITE', 'VARNAME');
 		}
-		vinfo.value = value;
+		vinfo.value = tclobj.AsObj(value);
 		return value;
 	};
 
@@ -72,7 +82,7 @@ return function(){
 			throw new TclError('can\'t set "'+array+'('+index+')": variable isn\'t array',
 				'TCL', 'LOOKUP', 'VARNAME', array);
 		}
-		vinfo.value[index] = value;
+		vinfo.value[index] = tclobj.AsObj(value);
 		return value;
 	};
 
@@ -89,6 +99,7 @@ return function(){
 
 	this.get_var = function(varname) {
 		var parts;
+		varname = tclobj.AsVal(varname);
 		if (varname[varname.length-1] === ')') {
 			parts = this._parse_varname(varname);
 			return this.get_array(parts[0], parts[1]);
@@ -99,6 +110,7 @@ return function(){
 
 	this.set_var = function(varname, value) {
 		var parts;
+		varname = tclobj.AsVal(varname);
 		if (varname[varname.length-1] === ')') {
 			parts = this._parse_varname(varname);
 			return this.set_array(parts[0], parts[1], value);
@@ -131,7 +143,7 @@ return function(){
 	};
 
 	this.resolve_word = function(tokens) {
-		var i, word, token, array, index, expand = false;
+		var i, word, parts=[], res, token, array, index, expand = false;
 
 		for (i=0; i<tokens.length; i++) {
 			token = tokens[i];
@@ -141,37 +153,42 @@ return function(){
 					break;
 
 				case parser.TXT:
-					if (word === undefined) {word = '';}
-					word += token[1];
+					parts.push(tclobj.NewString(token[1]));
 					break;
 
 				case parser.VAR:
-					if (word === undefined) {word = '';}
-					word += this.get_scalar(token[1]);
+					parts.push(this.get_scalar(token[1]));
 					break;
 
 				case parser.ARRAY:
-					if (word === undefined) {word = '';}
 					array = token[1];
 					i += 2; token = tokens[i];
 					if (token[0] !== parser.INDEX) {
 						throw new parser.ParseError('Expecting INDEX token, found: '+parser.tokenname[token[0]]);
 					}
 					index = this.resolve_word(token[1]).join('');
-					word += this.get_array(array, index);
+					parts.push(this.get_array(array, index));
 					break;
 
 				case parser.SCRIPT:
-					if (word === undefined) {word = '';}
-					word += this.exec(token[1]);
+					parts.push(this.exec(token[1]));
 					break;
 			}
 		}
 
-		if (word === undefined) {
+		if (parts.length === 0) {
 			return [];
 		}
-		return expand ? list.list2array(word) : [word];
+		if (parts.length > 1) {
+			word = '';
+			for (i=0; i<parts.length; i++) {
+				word += parts[i].GetString();
+			}
+			res = tclobj.NewString(word);
+		} else {
+			res = parts[0];
+		}
+		return expand ? tclobj.GetList(res) : [res];
 	};
 
 	this.get_words = function(command) {
@@ -201,6 +218,9 @@ return function(){
 			args.push(words[i]);
 		}
 		result = command.cinfo.handler.call(command.thisobj, args, this, command.priv);
+		if (!(result instanceof tclobj.TclObject)) {
+			result = tclobj.NewObj('auto', result);
+		}
 		return result;
 	};
 
@@ -223,6 +243,7 @@ return function(){
 
 	this['TclEval'] = this.TclEval;
 	this['TclError'] = TclError;
+	this['tclobj'] = tclobj;
 	this['registerCommand'] = this.registerCommand;
 	this['get_var'] = this.get_var;
 	this['get_scalar'] = this.get_scalar;

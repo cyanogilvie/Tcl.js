@@ -1,3 +1,6 @@
+/*jslint plusplus: true, white: true, nomen: true */
+/*global require */
+
 require([
 	'tcl/parser',
 	'tcl/interp',
@@ -9,10 +12,11 @@ require([
 	domConstruct,
 	query
 ) {
+	"use strict";
 	function show_script(commands, node) {
 		var command, first, word, i, j;
 		function show_tokens(tokens, tnode, isscript) {
-			var i, j, k, token, classname;
+			var k, token, classname;
 
 			for (k=0; k<tokens.length; k++) {
 				token = tokens[k];
@@ -60,7 +64,7 @@ require([
 		interp.registerCommand('puts', function(args){
 			var message;
 			if (args.length < 2 || args.length > 3) {
-				throw new TclError('wrong # args: should be "puts ?-nonewline? string"',
+				throw new interp.TclError('wrong # args: should be "puts ?-nonewline? string"',
 					'TCL', 'WRONGARGS');
 			}
 			if (args.length === 2) {
@@ -93,22 +97,22 @@ require([
 		});
 		interp.TclEval(script);
 	}
-	query('#test1').on('click', function(e){
+	query('#test1').on('click', function(){
 		run('set a [getstring; list 2]\nputs "($a)"');
 	});
-	query('#test2').on('click', function(e){
+	query('#test2').on('click', function(){
 		run('set a [getstring; list 2]\nputs {($a)}');
 	});
-	query('#test3').on('click', function(e){
+	query('#test3').on('click', function(){
 		run('set a [get\\ string; list \\u306f]\nputs ({$a})');
 	});
-	query('#test4').on('click', function(e){
+	query('#test4').on('click', function(){
 		run('#comment 1\nset a(foo) [get\\ string; list \\u306f]\nputs "(hello index foo of a: $a(foo))"');
 	});
-	query('#test5').on('click', function(e){
+	query('#test5').on('click', function(){
 		run('#comment 1\nset a(foo) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(foo))"');
 	});
-	query('#test6').on('click', function(e){
+	query('#test6').on('click', function(){
 		run('#comment 1\nset o 0;set a(fo0\\ o) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(f[say_o]${o} o)), again: (${a(fo0 o)})"');
 	});
 });

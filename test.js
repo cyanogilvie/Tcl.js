@@ -1,45 +1,90 @@
 require([
 	'tcl/parser',
+	'tcl/interp',
 	'dojo/dom-construct',
 	'dojo/query'
 ], function(
 	parser,
+	TclInterp,
 	domConstruct,
 	query
 ) {
 	function show_script(commands, node) {
-		var i, j, k, command, first, word, token, classname;
+		var command, first, word, i, j;
+		function show_tokens(tokens, tnode, isscript) {
+			var i, j, k, token, classname;
+
+			for (k=0; k<tokens.length; k++) {
+				token = tokens[k];
+				if (token[0] === parser.SCRIPT) {
+					show_script(token[1], tnode, true);
+				} else if (token[0] === parser.INDEX) {
+					show_tokens(token[1], domConstruct.create('span', {
+						className: 'tok_INDEX'
+					}, tnode), false);
+				} else {
+					classname = 'tok tok_'+parser.tokenname[token[0]];
+					if (isscript && token[0] === parser.TXT && first) {
+						classname += ' tok_commandname';
+						first = false;
+					}
+					domConstruct.create('span', {
+						className: classname,
+						innerHTML: token[1]
+					}, tnode);
+				}
+			}
+		}
+
 		for (i=0; i<commands.length; i++) {
 			command = commands[i];
 			first = true;
 			for (j=0; j<command.length; j++) {
 				word = command[j];
-				for (k=0; k<word.length; k++) {
-					token = word[k];
-					if (token[0] === parser.SCRIPT) {
-						show_script(token[1], node);
-					} else {
-						classname = 'tok tok_'+parser.tokenname[token[0]];
-						if (token[0] === parser.TXT && first) {
-							classname += ' tok_commandname';
-							first = false;
-						}
-						domConstruct.create('span', {
-							className: classname,
-							innerHTML: token[1]
-						}, node);
-					}
-				}
+				show_tokens(word, node, true);
 			}
 		}
 	}
 	function run(script) {
-		var commands = parser.parse_script(script), node;
+		var interp = new TclInterp(),
+			commands = parser.parse_script(script), node, outputnode;
+
 		domConstruct.create('pre', {
-			innerHTML: commands
+			innerHTML: commands.join('\n')
 		}, 'output');
 		node = domConstruct.create('pre', {}, 'output');
 		show_script(commands[1], node);
+		outputnode = domConstruct.create('pre', {
+			className: 'script_output'
+		}, 'output');
+		interp.registerCommand('puts', function(args){
+			var message;
+			if (args.length < 2 || args.length > 3) {
+				throw new TclError('wrong # args: should be "puts ?-nonewline? string"',
+					'TCL', 'WRONGARGS');
+			}
+			if (args.length === 2) {
+				message = args[1] + '\n';
+			} else {
+				message = args[2];
+			}
+			domConstruct.create('span', {innerHTML: message}, outputnode);
+		});
+		interp.registerCommand('getstring', function(args, interp){
+			if (args.length !== 1) {
+				throw new interp.TclError('wrong # args: should be "'+args[0]+'"',
+					'TCL', 'WRONGARGS');
+			}
+			return 'result of getstring';
+		});
+		interp.registerCommand('get string', function(args, interp){
+			if (args.length !== 1) {
+				throw new interp.TclError('wrong # args: should be "'+args[0]+'"',
+					'TCL', 'WRONGARGS');
+			}
+			return 'result of get string';
+		});
+		interp.TclEval(script);
 	}
 	query('#test1').on('click', function(e){
 		run('set a [getstring; list 2]\nputs "($a)"');
@@ -48,9 +93,12 @@ require([
 		run('set a [getstring; list 2]\nputs {($a)}');
 	});
 	query('#test3').on('click', function(e){
-		run('set a [get\\ string; list \\u306f]\nputs {({$a})}');
+		run('set a [get\\ string; list \\u306f]\nputs ({$a})');
 	});
 	query('#test4').on('click', function(e){
-		run('#set a(foo) [get\\ string; list \\u306f]\nputs "(hello index foo of a: $a(foo))"');
+		run('#comment 1\nset a(foo) [get\\ string; list \\u306f]\nputs "(hello index foo of a: $a(foo))"');
+	});
+	query('#test5').on('click', function(e){
+		run('#comment 1\nset a(foo) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(foo))"');
 	});
 });

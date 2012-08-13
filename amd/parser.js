@@ -128,12 +128,18 @@ function parse_script(text) {
 			emit([t.SYNTAX, text[i++]]);
 
 			function parse_index() {
+				var saved_tokens, indextokens;
 				// escape, variable and command substs apply here
 				emit([t.SYNTAX, text[i++]]);
+				saved_tokens = tokens.slice(0);
+				tokens = [];
 				while (true) {
 					switch (text[i]) {
 						case ')':
-							emit([t.INDEX, token]);
+							emit_waiting(t.TXT);
+							indextokens = tokens.slice(0);
+							tokens = saved_tokens;
+							emit([t.INDEX, indextokens]);
 							emit([t.SYNTAX, text[i++]]);
 							return;
 
@@ -313,7 +319,7 @@ function parse_script(text) {
 			case '"':		return parse_combined(true);
 			case ']':
 				if (incmdsubst) {
-					emit([t.EOL, ']']);
+					emit([t.END, text[i++]]);
 					return tokens;
 				}
 				// Falls through to default

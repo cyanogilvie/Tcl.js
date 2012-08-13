@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Madness!</title>
+		<script type="text/javascript">
+			var dojoConfig = {
+				async: true,
+				tlmSiblingOfDojo: false,
+				isDebug: true,
+				packages: [
+					{name: 'tcl', location: '../amd'}
+				]
+			};
+		</script>
+		<script type="text/javascript" src="dojo/dojo.js"></script>
+		<script type="text/javascript" src="test.js"></script>
+		<style type="text/css">
+			body {
+				background: #000;
+				color: #ccc;
+				font-size: 12pt;
+			}
+			.tok:hover {
+				background: yellow;
+			}
+
+			.tok_SYNTAX, .tok_END {
+				color: #555;
+			}
+
+			.tok_commandname {
+				color: #ee0;
+			}
+			.tok_VAR, .tok_ARRAY {
+				color: #55f;
+			}
+			.tok_INDEX {
+				color: #99f;
+			}
+		</style>
+	</head>
+	<body>
+		<button type="button" id="test1">Run Test1</button>
+		<button type="button" id="test2">Run Test2</button>
+		<button type="button" id="test3">Run Test3</button>
+		<button type="button" id="test4">Run Test4</button>
+		<h1>Output:</h1>
+		<div id="output"></div>
+	</body>
+</html>

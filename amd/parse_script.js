@@ -337,11 +337,7 @@ function parse_script(text) {
 	// First unfold - happens even in brace quoted words
 	text = text.replace(/\\\n\s*/g, ' ');
 
-	var patience = 100;
 	while (true) {
-		if (patience-- < 0) {
-			debugger;
-		}
 		word = get_word(command.length === 0, false);
 		command.push(word);
 		lasttoken = word[word.length-1];

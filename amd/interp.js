@@ -133,7 +133,6 @@ return function(){
 	this.resolve_word = function(tokens) {
 		var i, word, token, array, index, expand = false;
 
-		//console.log('tokens: ', tokens);
 		for (i=0; i<tokens.length; i++) {
 			token = tokens[i];
 			switch (token[0]) {
@@ -158,7 +157,6 @@ return function(){
 					if (token[0] !== parser.INDEX) {
 						throw new parser.ParseError('Expecting INDEX token, found: '+parser.tokenname[token[0]]);
 					}
-					console.log('resolving array index:', token[1]);
 					index = this.resolve_word(token[1]).join('');
 					word += this.get_array(array, index);
 					break;
@@ -202,7 +200,6 @@ return function(){
 		for (i=0; i<words.length; i++) {
 			args.push(words[i]);
 		}
-		console.log('eval_command running '+command.text);
 		result = command.cinfo.handler.call(command.thisobj, args, this, command.priv);
 		return result;
 	};
@@ -250,8 +247,5 @@ return function(){
 	this.registerCommand('list', function(args){
 		return list.array2list(args.slice(1));
 	});
-
-	console.log('registered commands: ', this.commands);
-	console.log('registered variables: ', this.variables);
 };
 });

@@ -99,6 +99,7 @@ function parse_script(text) {
 
 		function parse_commands() {
 			var word, lasttoken, command = [], commands = [];
+			emit_waiting(t.TXT);
 			emit([t.SYNTAX, text[i++]]);
 			while (true) {
 				word = get_word(command.length === 0, true);
@@ -158,13 +159,14 @@ function parse_script(text) {
 				if (idx === -1) {
 					throw new ParseError('missing close-brace for variable name');
 				}
-				token = text.substr(i, idx);
-				i += idx;
+				token = text.substr(i, idx-i);
+				i += idx-i;
 				if (token[token.length-1] === ')' && (idx = token.lastIndexOf('(')) !== -1) {
-					token = token.substr(0, idx);
-					emit([t.ARRAY, token]);
 					save_i = i;
-					i = idx;
+					i -= token.length;
+					token = token.substr(0, idx);
+					i += token.length;
+					emit([t.ARRAY, token]);
 					parse_index();
 					i = save_i;
 				} else {

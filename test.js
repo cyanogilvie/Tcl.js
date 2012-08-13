@@ -84,6 +84,13 @@ require([
 			}
 			return 'result of get string';
 		});
+		interp.registerCommand('say_o', function(args, interp){
+			if (args.length !== 1) {
+				throw new interp.TclError('wrong # args: should be "'+args[0]+'"',
+					'TCL', 'WRONGARGS');
+			}
+			return 'o';
+		});
 		interp.TclEval(script);
 	}
 	query('#test1').on('click', function(e){
@@ -100,5 +107,8 @@ require([
 	});
 	query('#test5').on('click', function(e){
 		run('#comment 1\nset a(foo) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(foo))"');
+	});
+	query('#test6').on('click', function(e){
+		run('#comment 1\nset o 0;set a(fo0o) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(f[say_o]${o}o)), again: (${a(fo0o)})"');
 	});
 });

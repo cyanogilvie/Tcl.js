@@ -1,14 +1,14 @@
 require([
-	'tcl/parse_script',
+	'tcl/parser',
 	'dojo/dom-construct',
 	'dojo/query'
 ], function(
-	parse_script,
+	parser,
 	domConstruct,
 	query
 ) {
 	function show_script(commands, node) {
-		var i, j, k, command, first, word, token;
+		var i, j, k, command, first, word, token, classname;
 		for (i=0; i<commands.length; i++) {
 			command = commands[i];
 			first = true;
@@ -16,33 +16,29 @@ require([
 				word = command[j];
 				for (k=0; k<word.length; k++) {
 					token = word[k];
-					if (token[0] === 'SCRIPT') {
+					if (token[0] === parser.SCRIPT) {
 						show_script(token[1], node);
 					} else {
-						if (token[0] === 'TOK' && first) {
-							domConstruct.create('span', {
-								className: 'tok tok_'+token[0]+' tok_commandname',
-								innerHTML: token[1]
-							}, node);
+						classname = 'tok tok_'+parser.tokenname[token[0]];
+						if (token[0] === parser.TXT && first) {
+							classname += ' tok_commandname';
 							first = false;
-						} else {
-							domConstruct.create('span', {
-								className: 'tok tok_'+token[0],
-								innerHTML: token[1]
-							}, node);
 						}
+						domConstruct.create('span', {
+							className: classname,
+							innerHTML: token[1]
+						}, node);
 					}
 				}
 			}
 		}
 	}
 	function run(script) {
-		var commands = parse_script(script), node;
+		var commands = parser.parse_script(script), node;
 		domConstruct.create('pre', {
 			innerHTML: commands
 		}, 'output');
 		node = domConstruct.create('pre', {}, 'output');
-		console.log('commands[0]:', commands[1]);
 		show_script(commands[1], node);
 	}
 	query('#test1').on('click', function(e){
@@ -55,6 +51,6 @@ require([
 		run('set a [get\\ string; list \\u306f]\nputs {({$a})}');
 	});
 	query('#test4').on('click', function(e){
-		run('set a(foo) [get\\ string; list \\u306f]\nputs "($a(foo))"');
+		run('#set a(foo) [get\\ string; list \\u306f]\nputs "(hello index foo of a: $a(foo))"');
 	});
 });

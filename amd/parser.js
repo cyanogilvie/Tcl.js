@@ -4,32 +4,20 @@
 define(function(){
 "use strict";
 
-/* For debugging
- */
-var TOK		= 'TOK',
-	SPACE	= 'SPACE',
-	VAR		= 'VAR',
-	ARRAY	= 'ARRAY',
-	INDEX	= 'INDEX',
-	EOL		= 'EOL',
-	END		= 'END',
-	SCRIPT	= 'SCRIPT',
-	COMMENT	= 'COMMENT',
-	EXPAND	= 'EXPAND',
-	SYNTAX	= 'SYNTAX';
-	/*
-var TOK		= 0,
-	SPACE	= 1,
-	VAR		= 2,
-	ARRAY	= 3,
-	INDEX	= 4,
-	EOL		= 5,
-	END		= 6,
-	SCRIPT	= 7,
-	COMMENT	= 8,
-	EXPAND	= 9,
-	SYNTAX	= 10;
- */
+var iface, e,
+	t = {
+		TXT		: 0,
+		SPACE	: 1,
+		VAR		: 2,
+		ARRAY	: 3,
+		INDEX	: 4,
+		EOL		: 5,
+		END		: 6,
+		SCRIPT	: 7,
+		COMMENT	: 8,
+		EXPAND	: 9,
+		SYNTAX	: 10
+	};
 
 function ParseError(message) {
 	this.name = 'ParseError';
@@ -111,22 +99,22 @@ function parse_script(text) {
 
 		function parse_commands() {
 			var word, lasttoken, command = [], commands = [];
-			emit([SYNTAX, text[i++]]);
+			emit([t.SYNTAX, text[i++]]);
 			while (true) {
 				word = get_word(command.length === 0, true);
 				command.push(word);
 				lasttoken = word[word.length-1];
-				if (lasttoken[0] === EOL) {
+				if (lasttoken[0] === t.EOL) {
 					commands.push(command);
 					command = [];
 				}
-				if (lasttoken[0] === END) {
+				if (lasttoken[0] === t.END) {
 					commands.push(command);
 					command = [];
 					break;
 				}
 			}
-			emit([SCRIPT, commands]);
+			emit([t.SCRIPT, commands]);
 		}
 
 		function parse_variable() {
@@ -136,17 +124,17 @@ function parse_script(text) {
 				token += text[i++];
 				return;
 			}
-			emit_waiting(TOK);
-			emit([SYNTAX, text[i++]]);
+			emit_waiting(t.TXT);
+			emit([t.SYNTAX, text[i++]]);
 
 			function parse_index() {
 				// escape, variable and command substs apply here
-				emit([SYNTAX, text[i++]]);
+				emit([t.SYNTAX, text[i++]]);
 				while (true) {
 					switch (text[i]) {
 						case ')':
-							emit([INDEX, token]);
-							emit([SYNTAX, text[i++]]);
+							emit([t.INDEX, token]);
+							emit([t.SYNTAX, text[i++]]);
 							return;
 
 						case '\\': parse_escape(); break;
@@ -159,7 +147,7 @@ function parse_script(text) {
 			}
 
 			if (text[i] === '{') {
-				emit([SYNTAX, text[i++]]);
+				emit([t.SYNTAX, text[i++]]);
 				idx = text.indexOf('}', i);
 				if (idx === -1) {
 					throw new ParseError('missing close-brace for variable name');
@@ -168,15 +156,15 @@ function parse_script(text) {
 				i += idx;
 				if (token[token.length-1] === ')' && (idx = token.lastIndexOf('(')) !== -1) {
 					token = token.substr(0, idx);
-					emit([ARRAY, token]);
+					emit([t.ARRAY, token]);
 					save_i = i;
 					i = idx;
 					parse_index();
 					i = save_i;
 				} else {
-					emit([VAR, token]);
+					emit([t.VAR, token]);
 				}
-				emit([SYNTAX, text[i++]]);
+				emit([t.SYNTAX, text[i++]]);
 			} else {
 				token = text.substr(i).match(/[a-zA-Z_0-9:]+/)[0];
 				// : alone is a name terminator
@@ -186,9 +174,9 @@ function parse_script(text) {
 				}
 				i += token.length;
 				if (text[i] !== '(') {
-					emit([VAR, token]);
+					emit([t.VAR, token]);
 				} else {
-					emit([ARRAY, token]);
+					emit([t.ARRAY, token]);
 					parse_index();
 				}
 			}
@@ -196,7 +184,7 @@ function parse_script(text) {
 
 		function parse_braced() {
 			var idx, depth = 1, from;
-			emit([SYNTAX, text[i++]]);
+			emit([t.SYNTAX, text[i++]]);
 			from = i;
 			while (depth) {
 				idx = text.substr(i).search(/[{}]/);
@@ -212,8 +200,8 @@ function parse_script(text) {
 				i++;
 			}
 			i--;
-			emit([TOK, text.substr(from, i-from)]);
-			emit([SYNTAX, text[i++]]);
+			emit([t.TXT, text.substr(from, i-from)]);
+			emit([t.SYNTAX, text[i++]]);
 			return tokens;
 		}
 
@@ -221,7 +209,7 @@ function parse_script(text) {
 			var matched;
 
 			if (quoted) {
-				emit([SYNTAX, text[i++]]);
+				emit([t.SYNTAX, text[i++]]);
 			}
 
 			while (true) {
@@ -236,8 +224,8 @@ function parse_script(text) {
 							if (text[i+1] !== undefined && !/[\s;]/.test(text[i+1])) {
 								throw new ParseError('extra characters after close-quote');
 							}
-							emit_waiting(TOK);
-							emit([SYNTAX, text[i++]]);
+							emit_waiting(t.TXT);
+							emit([t.SYNTAX, text[i++]]);
 							return tokens;
 
 						default: matched = false;
@@ -245,20 +233,20 @@ function parse_script(text) {
 				} else {
 					switch (text[i]) {
 						case undefined:
-							emit_waiting(TOK);
-							emit([END, '']);
+							emit_waiting(t.TXT);
+							emit([t.END, '']);
 							return tokens;
 
 						case '\n':
 						case ';':
-							emit_waiting(TOK);
+							emit_waiting(t.TXT);
 							token = text[i++];
-							emit([EOL, token]);
+							emit([t.EOL, token]);
 							return tokens;
 
 						case ' ':
 						case '\t':
-							emit_waiting(TOK);
+							emit_waiting(t.TXT);
 							return tokens;
 
 						default: matched = false;
@@ -281,9 +269,9 @@ function parse_script(text) {
 
 						case ']':
 							if (incmdsubst) {
-								emit_waiting(TOK);
+								emit_waiting(t.TXT);
 								token = text[i++];
-								emit([END, token]);
+								emit([t.END, token]);
 								return tokens;
 							}
 							// Falls through
@@ -304,28 +292,28 @@ function parse_script(text) {
 			while (/[\t ]/.test(text[i])) {
 				token += text[i++];
 			}
-			emit_waiting(SPACE);
+			emit_waiting(t.SPACE);
 			if (first && text[i] === '#') {
 				while (text[i] !== undefined && text[i] !== '\n') {
 					token += text[i++];
 				}
-				emit([COMMENT, token]);
+				emit([t.COMMENT, token]);
 			}
 		}
 
 		// handle {*}
 		if (text[i] === '{' && text.substr(i, 3) === '{*}') {
-			emit([EXPAND, '{*}']);
+			emit([t.EXPAND, '{*}']);
 			i += 3;
 		}
 
 		switch (text[i]) {
-			case undefined:	emit([END, '']); return tokens;
+			case undefined:	emit([t.END, '']); return tokens;
 			case '{':		return parse_braced();
 			case '"':		return parse_combined(true);
 			case ']':
 				if (incmdsubst) {
-					emit([EOL, ']']);
+					emit([t.EOL, ']']);
 					return tokens;
 				}
 				// Falls through to default
@@ -341,18 +329,28 @@ function parse_script(text) {
 		word = get_word(command.length === 0, false);
 		command.push(word);
 		lasttoken = word[word.length-1];
-		if (lasttoken[0] === EOL) {
+		if (lasttoken[0] === t.EOL) {
 			commands.push(command);
 			command = [];
-		} else if (lasttoken[0] === END) {
+		} else if (lasttoken[0] === t.END) {
 			commands.push(command);
 			command = [];
 			break;
 		}
 	}
-	return [SCRIPT, commands];
+	return [t.SCRIPT, commands];
 }
 
-return parse_script;
-
+iface = {
+	'parse_script': parse_script,
+	'ParseError': ParseError,
+	'tokenname': {}
+};
+for (e in t) {
+	if (t.hasOwnProperty(e)) {
+		iface[e] = t[e];
+		iface['tokenname'][t[e]] = e;
+	}
+}
+return iface;
 });

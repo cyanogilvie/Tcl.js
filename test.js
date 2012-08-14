@@ -4,11 +4,13 @@
 require([
 	'tcl/parser',
 	'tcl/interp',
+	'tcl/promise',
 	'dojo/dom-construct',
 	'dojo/query'
 ], function(
 	parser,
 	TclInterp,
+	Promise,
 	domConstruct,
 	query
 ) {
@@ -95,7 +97,22 @@ require([
 			}
 			return 'o';
 		});
-		interp.TclEval(script);
+		interp.registerCommand('bar', function(args, interp){
+			var promise = new Promise();
+			if (args.length !== 1) {
+				throw new interp.TclError('wrong # args: should be "'+args[0]+'"',
+					'TCL', 'WRONGARGS');
+			}
+			setTimeout(function(){
+				promise.reject('delayed result');
+			}, 2000);
+			return promise;
+		});
+		interp.TclEval(script).then(function(result){
+			console.log('Got ok: ', result);
+		}, function(err){
+			console.log('Got error: ', err);
+		});
 	}
 	query('#test1').on('click', function(){
 		run('set a [getstring; list 2]\nputs "($a)"');
@@ -113,6 +130,6 @@ require([
 		run('#comment 1\nset a(foo) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(foo))"');
 	});
 	query('#test6').on('click', function(){
-		run('#comment 1\nset o 0;set a(fo0\\ o) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(f[say_o]${o} o)), again: (${a(fo0 o)})"');
+		run('#comment 1\nset o 0;set a(fo0\\ o) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(f[say_o]${o} o)), again: (${a(fo0 o)})"\nputs [bar]');
 	});
 });

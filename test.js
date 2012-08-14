@@ -109,7 +109,7 @@ require([
 			return promise;
 		});
 		interp.TclEval(script).then(function(result){
-			console.log('Got ok: ', result);
+			console.log('Got ok: ', result, ' string concat: "'+result.result+'"');
 		}, function(err){
 			console.log('Got error: ', err);
 		});
@@ -130,6 +130,6 @@ require([
 		run('#comment 1\nset a(foo) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(foo))"');
 	});
 	query('#test6').on('click', function(){
-		run('#comment 1\nset o 0;set a(fo0\\ o) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(f[say_o]${o} o)), again: (${a(fo0 o)})"\nputs [bar]');
+		run('#comment 1\nset o 0;set a(fo0\\ o) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(f[say_o]${o} o)), again: (${a(fo0 o)})"\nputs [bar]; set x {final result}');
 	});
 });

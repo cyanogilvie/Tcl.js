@@ -104,7 +104,7 @@ require([
 					'TCL', 'WRONGARGS');
 			}
 			setTimeout(function(){
-				promise.reject('delayed result');
+				promise.resolve('delayed result');
 			}, 2000);
 			return promise;
 		});

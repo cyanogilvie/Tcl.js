@@ -4,7 +4,7 @@
 require([
 	'tcl/parser',
 	'tcl/interp',
-	'tcl/promise',
+	'cflib/promise',
 	'dojo/dom-construct',
 	'dojo/query'
 ], function(

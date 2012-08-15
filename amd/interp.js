@@ -5,14 +5,16 @@ define([
 	'./parser',
 	'./tclobject',
 	'./list',
-	'./promise',
+	'cflib/promise',
+	'cflib/tailcall',
 
 	'./objtype_list'
 ], function(
 	parser,
 	tclobj,
 	list,
-	Promise
+	Promise,
+	TailCall
 ){
 "use strict";
 
@@ -26,7 +28,7 @@ TclError.prototype = new Error();
 
 function TclResult(code, result, options) {
 	this.code = code;
-	this.result = result;
+	this.result = result || '';
 	this.options = options;
 }
 
@@ -314,29 +316,23 @@ return function(){
 		if (promise === undefined) {promise = new Promise();}
 		if (lastresult === undefined) {lastresult = new TclResult(OK, '');}
 
-		command = commands.shift();
-
-		function callnext(){
-			if (commands.length === 0) {
-				if (lastresult.code === OK || lastresult.code === RETURN) {
-					promise.resolve(lastresult);
-				} else {
-					promise.reject(lastresult);
-				}
-				return;
+		if (commands.length === 0) {
+			if (lastresult.code === OK || lastresult.code === RETURN) {
+				return promise.resolve(lastresult);
+			} else {
+				return promise.reject(lastresult);
 			}
-			setTimeout(function(){
-				self.exec(commands, promise, lastresult);
-			}, 0);
 		}
+
+		command = commands.shift();
 
 		this.eval_command(command).then(function(result){
 			if (result !== null) {
 				lastresult = result;
 			}
-			callnext();
+			return new TailCall(self, self.exec, [commands, promise, lastresult]);
 		}, function(err){
-			promise.reject(err);
+			return new TailCall(promise, promise.reject, [err]);
 		});
 
 		return promise;

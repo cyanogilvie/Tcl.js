@@ -111,8 +111,9 @@ require([
 		interp.TclEval(script).then(function(result){
 			console.log('Got ok: ', result, ' string concat: "'+result.result+'"');
 		}, function(err){
-			console.log('Got error: ', err);
+			console.log('Got error: ', err, ': "'+err+'"');
 		});
+		console.log('TclEval returned');
 	}
 	query('#test1').on('click', function(){
 		run('set a [getstring; list 2]\nputs "($a)"');

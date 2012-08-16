@@ -118,9 +118,8 @@ return function(){
 		if (varname[varname.length-1] === ')') {
 			parts = this._parse_varname(varname);
 			return this.get_array(parts[0], parts[1]);
-		} else {
-			return this.get_scalar(varname);
 		}
+		return this.get_scalar(varname);
 	};
 
 	this.set_var = function(varname, value) {
@@ -129,9 +128,8 @@ return function(){
 		if (varname[varname.length-1] === ')') {
 			parts = this._parse_varname(varname);
 			return this.set_array(parts[0], parts[1], value);
-		} else {
-			return this.set_scalar(varname, value);
 		}
+		return this.set_scalar(varname, value);
 	};
 
 	this.resolve_command = function(commandname, failifmissing) {
@@ -157,18 +155,15 @@ return function(){
 		cinfo.onDelete = onDelete;
 	};
 
-	this.resolve_word = function(tokens, parts, promise, expand, array) {
-		var i, word, res, token, index, self=this;
-		if (parts === undefined) {parts = [];}
-		if (promise === undefined) {promise = new Promise();}
-		if (expand === undefined) {expand = false;}
+	this.resolve_word = function(tokens, c_ok, c_err) {
+		var parts=[], expand=false, array, self=this;
 
-		token = tokens.shift();
+		function callnext(token){
+			var i, word, res, index;
 
-		function callnext(){
-			if (tokens.length === 0) {
+			if (token === undefined) {
 				if (parts.length === 0) {
-					return promise.resolve([]);
+					return c_ok([]);
 				}
 				if (parts.length > 1) {
 					word = '';
@@ -179,96 +174,96 @@ return function(){
 				} else {
 					res = parts[0];
 				}
-				return promise.resolve(expand ? tclobj.GetList(res) : [res]);
+				return c_ok(expand ? tclobj.GetList(res) : [res]);
 			}
-			self.resolve_word(tokens, parts, promise, expand, array);
+
+			switch (token[0]) {
+				case parser.EXPAND:
+					expand = true;
+					break;
+
+				case parser.TXT:
+					parts.push(tclobj.NewString(token[1]));
+					break;
+
+				case parser.VAR:
+					parts.push(self.get_scalar(token[1]));
+					break;
+
+				case parser.ARRAY:
+					array = token[1];
+					break;
+
+				case parser.INDEX:
+					return new TailCall(self.resolve_word, [token[1], function(indexwords){
+						index = indexwords.join('');
+						parts.push(self.get_array(array, index));
+						array = null;
+						return new TailCall(callnext, [tokens.shift()]);
+					}, function(err){
+						return c_err(err);
+					}], self);
+
+				case parser.SCRIPT:
+					return new TailCall(self.exec, [token[1], function(result){
+						parts.push(result.result);
+						return new TailCall(callnext, [tokens.shift()]);
+					}, function(err){
+						return c_err(err);
+					}], self);
+			}
+
+			return new TailCall(callnext, [tokens.shift()]);
 		}
 
-		switch (token[0]) {
-			case parser.EXPAND:
-				expand = true;
-				callnext();
-				break;
-
-			case parser.TXT:
-				parts.push(tclobj.NewString(token[1]));
-				callnext();
-				break;
-
-			case parser.VAR:
-				parts.push(this.get_scalar(token[1]));
-				callnext();
-				break;
-
-			case parser.ARRAY:
-				array = token[1];
-				callnext();
-				break;
-
-			case parser.INDEX:
-				this.resolve_word(token[1]).then(function(indexwords){
-					index = indexwords.join('');
-					parts.push(self.get_array(array, index));
-					array = null;
-					callnext();
-				});
-				break;
-
-			case parser.SCRIPT:
-				this.exec(token[1]).then(function(result){
-					parts.push(result.result);
-					callnext();
-				}, function(err){
-					promise.reject(err);
-				});
-				break;
-
-			default:
-				callnext();
-		}
-
-		return promise;
+		return callnext(tokens.shift());
 	};
 
-	this.get_words = function(remaining, sofar, promise) {
-		var next = remaining.shift(), self = this;
+	this.get_words = function(remaining, c_ok, c_err) {
+		var self = this, sofar = [];
 
-		if (sofar === undefined) {sofar = [];}
-		if (promise === undefined) {promise = new Promise();}
+		function get_next(next){
+			var resolved;
 
-		function callnext() {
-			if (remaining.length === 0) {
+			if (next === undefined) {
 				if (sofar.length > 0) {
+					try {
+						resolved = self.resolve_command(sofar[0]);
+					} catch(e){
+						return c_err(e);
+					}
 					sofar[0] = {
 						text: sofar[0],
-						cinfo: self.resolve_command(sofar[0])
+						cinfo: resolved
 					};
 				}
-				promise.resolve(sofar);
-				return;
+				return c_ok(sofar);
 			}
-			self.get_words(remaining, sofar, promise);
+
+			return new TailCall(self.resolve_word, [next, function(addwords){
+				var i;
+				for (i=0; i<addwords.length; i++) {
+					sofar.push(addwords[i]);
+				}
+				return get_next(remaining.shift());
+			}, function(err){
+				return c_err(err);
+			}], self);
 		}
 
-		this.resolve_word(next).then(function(addwords){
-			var i;
-			for (i=0; i<addwords.length; i++) {
-				sofar.push(addwords[i]);
-			}
-			callnext();
-		}, function(err){
-			promise.reject(err);
-		});
-
-		return promise;
+		return get_next(remaining.shift());
 	};
 
-	this.eval_command = function(commandline) {
-		var command, result, args, i, self=this, promise=new Promise();
+	this.eval_command = function(commandline, c) {
+		var command, result, args, i, self=this;
 
 		function normalize_result(result) {
-			if (typeof result !== 'object' || !(result instanceof TclResult)) {
-				result = new TclResult(OK, result);
+			if (!(result instanceof TclResult)) {
+				if (result instanceof Error) {
+					result = new TclResult(ERROR, tclobj.NewString(result));
+				} else {
+					result = new TclResult(OK, result);
+				}
 			}
 			if (!(result.result instanceof tclobj.TclObject)) {
 				result.result = tclobj.NewObj('auto', result.result);
@@ -276,70 +271,77 @@ return function(){
 			return result;
 		}
 
-		this.get_words(commandline).then(function(words){
-			if (words.length > 0) {
-				command = words.shift();
-				args = [command.text];
-				for (i=0; i<words.length; i++) {
-					args.push(words[i]);
-				}
-				try {
-					result = command.cinfo.handler.call(command.thisobj, args, self, command.priv);
-				} catch (e){
-					result = new TclResult(ERROR, tclobj.NewString(e));
-				}
-				if (typeof result === 'object' && result instanceof Promise) {
-					result.then(function(result){
-						result = normalize_result(result);
-						promise.resolve(result);
-					}, function(err){
-						result = new TclResult(ERROR, tclobj.NewString(err));
-						promise.reject(result);
-					});
-					return promise;
-				}
-				result = normalize_result(result);
-			} else {
-				result = null;
-			}
-			promise.resolve(result);
-		}, function(err){
-			promise.reject(err);
-		});
-
-		return promise;
-	};
-
-	this.exec = function(commands, promise, lastresult) {
-		var command, self = this;
-
-		if (promise === undefined) {promise = new Promise();}
-		if (lastresult === undefined) {lastresult = new TclResult(OK, '');}
-
-		if (commands.length === 0) {
-			if (lastresult.code === OK || lastresult.code === RETURN) {
-				return promise.resolve(lastresult);
-			} else {
-				return promise.reject(lastresult);
-			}
+		function got_result(result) {
+			return c(normalize_result(result));
 		}
 
-		command = commands.shift();
-
-		this.eval_command(command).then(function(result){
-			if (result !== null) {
-				lastresult = result;
+		return this.get_words(commandline, function(words){
+			if (words.length === 0) {
+				return c(null);
 			}
-			return new TailCall(self, self.exec, [commands, promise, lastresult]);
+			command = words.shift();
+			args = [command.text];
+			for (i=0; i<words.length; i++) {
+				args.push(words[i]);
+			}
+			try {
+				result = command.cinfo.handler.call(command.thisobj, args, self, command.priv);
+			} catch(e) {
+				result = e;
+			}
+			if (result instanceof Promise) {
+				result.then(function(result){
+					self._trampoline(got_result(result));
+				}, function(err){
+					self._trampoline(got_result(new TclResult(ERROR, tclobj.NewString(err))));
+				});
+			} else {
+				return got_result(result);
+			}
 		}, function(err){
-			return new TailCall(promise, promise.reject, [err]);
+			return c(err);
 		});
+	};
 
-		return promise;
+	this.exec = function(commands, c_ok, c_err) {
+		var lastresult=null, self=this;
+
+		function eval_next(command){
+			if (command === undefined) {
+				if (lastresult.code === OK || lastresult.code === RETURN) {
+					return c_ok(lastresult);
+				}
+				return c_err(lastresult);
+			}
+
+			return new TailCall(self.eval_command, [command, function(result){
+				if (result !== null) {
+					if (result.code === ERROR) {
+						return c_err(result.result);
+					}
+					lastresult = result;
+				}
+				return eval_next(commands.shift());
+			}], self);
+		}
+
+		return eval_next(commands.shift());
+	};
+
+	this._trampoline = function(res) {
+		while (res instanceof TailCall) {
+			res = res.invoke();
+		}
 	};
 
 	this.TclEval = function(script) {
-		return this.exec(parser.parse_script(script)[1]);
+		var promise = new Promise();
+		this._trampoline(this.exec(parser.parse_script(script)[1], function(res){
+			promise.resolve(res);
+		}, function(err){
+			promise.reject(err);
+		}));
+		return promise;
 	};
 
 	this['TclEval'] = this.TclEval;
@@ -362,9 +364,8 @@ return function(){
 		}
 		if (args.length === 2) {
 			return interp.get_var(args[1]);
-		} else {
-			return interp.set_var(args[1], args[2]);
 		}
+		return interp.set_var(args[1], args[2]);
 	});
 
 	this.registerCommand('list', function(args){

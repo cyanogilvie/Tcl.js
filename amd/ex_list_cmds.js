@@ -20,10 +20,7 @@ function install(interp) {
 
 	interp.registerCommand('lindex', function(args){
 		var i, obj, idx, matches, list;
-		if (args.length < 2) {
-			throw new TclError('wrong # args: should be "lindex list ?index ...?"',
-				'TCL', 'WRONGARGS');
-		}
+		interp.checkArgs(args, 1, 'list ?index ...?');
 
 		obj = args[1];
 

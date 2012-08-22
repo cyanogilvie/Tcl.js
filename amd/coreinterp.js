@@ -30,6 +30,9 @@ function TclResult(code, result, options) {
 	this.code = code;
 	this.result = result || '';
 	this.options = options;
+	this.toString = function(){
+		return this.result.toString();
+	};
 }
 
 var SCALAR = 0,
@@ -156,6 +159,21 @@ return function(/* extensions... */){
 		cinfo.priv = priv;
 		cinfo.thisobj = thisobj !== undefined ? thisobj : null;
 		cinfo.onDelete = onDelete;
+	};
+
+	this.checkArgs = function(args, count, msg) {
+		var min, max;
+		if (count instanceof Array) {
+			min = count[0];
+			max = count[1];
+		} else {
+			min = count;
+			max = count;
+		}
+		if (args.length-1 < min || args.length-1 > max) {
+			throw new TclError('wrong # args: should be "'+args[0]+' '+msg+'"',
+				'TCL', 'WRONGARGS');
+		}
 	};
 
 	this.resolve_word = function(tokens, c_ok, c_err) {
@@ -320,7 +338,7 @@ return function(/* extensions... */){
 			return new TailCall(self.eval_command, [command, function(result){
 				if (result !== null) {
 					if (result.code === ERROR) {
-						return c_err(result.result);
+						return c_err(result);
 					}
 					lastresult = result;
 				}
@@ -352,6 +370,7 @@ return function(/* extensions... */){
 	this['TclResult'] = TclResult;
 	this['tclobj'] = tclobj;
 	this['registerCommand'] = this.registerCommand;
+	this['checkArgs'] = this.checkArgs;
 	this['get_var'] = this.get_var;
 	this['get_scalar'] = this.get_scalar;
 	this['get_array'] = this.get_array;

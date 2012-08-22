@@ -13,10 +13,7 @@ function install(interp) {
 	if (interp.register_extension('ex_core_cmds')) {return;}
 
 	interp.registerCommand('set', function(args, interp){
-		if (args.length < 2 || args.length > 3) {
-			throw new TclError('wrong # args: should be "set varName ?newValue?"',
-				'TCL', 'WRONGARGS');
-		}
+		interp.checkArgs(args, [1, 2], 'varName ?newValue?');
 		if (args.length === 2) {
 			return interp.get_var(args[1]);
 		}

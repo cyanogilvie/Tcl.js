@@ -56,23 +56,6 @@ function parse_tcl_list(str) { //<<<
 		return [];
 	}
 
-	/*
-	var hexmap = {
-		'a': 10,
-		'b': 11,
-		'c': 12,
-		'd': 13,
-		'e': 14,
-		'f': 15,
-		'A': 10,
-		'B': 11,
-		'C': 12,
-		'D': 13,
-		'E': 14,
-		'F': 15
-	};
-	*/
-
 	for (i=0; i<str.length; i++) {
 		ofs++;
 
@@ -426,21 +409,6 @@ function serialize_tcl_list(arr) { //<<<
 		if (
 			elem.length > 0 &&
 			problem_chars.test(elem) === false
-			/*
-			elem.indexOf(' ') === -1 &&
-			elem.indexOf('"') === -1 &&
-			elem.indexOf('}') === -1 &&
-			elem.indexOf('{') === -1 &&
-			elem.indexOf('$') === -1 &&
-			elem.indexOf(';') === -1 &&
-			elem.indexOf('\t') === -1 &&
-			elem.indexOf('\f') === -1 &&
-			elem.indexOf('\n') === -1 &&
-			elem.indexOf('\r') === -1 &&
-			elem.indexOf('\v') === -1 &&
-			elem.indexOf('[') === -1 &&
-			elem.indexOf(']') === -1
-			*/
 		) {
 			if (elem.indexOf('\\') === -1) {
 				staged.push(elem);

@@ -47,7 +47,6 @@ function TclObject(value) {
 	};
 	this['refcount'] = refcount;
 	this['bytes'] = null;
-	this['jsval'] = value;
 	this['updateString'] = function(){this.bytes = this.jsval.toString();};
 	this['updateJsVal'] = function(){};
 	this['setFromAny'] = function(obj){

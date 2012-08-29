@@ -8,7 +8,7 @@ define([
 	CoreInterp,
 	ex_core_cmds
 ){
-'use interp';
+'use strict';
 
 function Interp(){
 	var args = Array.prototype.slice.call(arguments), i;

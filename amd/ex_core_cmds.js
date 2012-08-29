@@ -2,7 +2,7 @@
 /*global define */
 
 define([
-	'./ex_list_cmds',
+	'./ex_list_cmds'
 ], function(
 	ex_list_cmds
 ){

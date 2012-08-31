@@ -26,7 +26,7 @@ function install(interp) {
 
 	interp.registerCommand('return', function(args, interp){
 		interp.checkArgs(args, [0, 1], '?value?');
-		if (args.length === 1) {
+		if (args.length === 2) {
 			return new TclResult(types.RETURN, interp.get_var(args[1]));
 		}
 		return new TclResult(types.RETURN, '');

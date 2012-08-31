@@ -1,7 +1,7 @@
 /*global define */
 /*jslint nomen: true, plusplus: true, white: true, browser: true, node: true, newcap: true, continue: true */
 
-define(function(){
+define(['./types'], function(types){
 "use strict";
 
 var problem_chars = /[ "{}$;\t\f\n\r\v\[\]]/,
@@ -10,17 +10,17 @@ var problem_chars = /[ "{}$;\t\f\n\r\v\[\]]/,
 
 // Exceptions <<<
 function ParseError(message) {
-	this.name = 'ParseError'
+	this.name = 'ParseError';
 	this.message = message;
 }
-ParseError.prototype = new Error;
+ParseError.prototype = new Error();
 
 function IncompleteError(message, missing) {
 	this.name = 'IncompleteError';
 	this.message = message;
 	this.missing = missing;
 }
-IncompleteError.prototype = new ParseError;
+IncompleteError.prototype = new ParseError();
 // Exceptions >>>
 
 function unicode_char(value) { //<<<
@@ -519,6 +519,8 @@ function to_tcl(from) { //<<<
 				return from;
 			} else if (from instanceof Date) {
 				return Math.floor(from.getTime()/1000);
+			} else if (from instanceof types.TclObject) {
+				return from.GetString();
 			} else {
 				// hopefully a generic object or instance of Function
 				staged = [];

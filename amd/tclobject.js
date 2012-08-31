@@ -1,7 +1,6 @@
-/*jslint plusplus: true, white: true, nomen: true, newcap: true */
+jslint plusplus: true, white: true, nomen: true, newcap: true */
 /*global define */
-
-define([], function(){
+(['./types'], function(types){
 "use strict";
 
 var iface, objtypes = {};
@@ -85,6 +84,7 @@ function TclObject(value) {
 		return this['GetString']();
 	};
 }
+types.TclObject = TclObject;
 
 RegisterObjType('jsval', TclObject);
 

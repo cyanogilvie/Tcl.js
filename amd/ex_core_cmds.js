@@ -2,14 +2,18 @@
 /*global define */
 
 define([
-	'./ex_list_cmds'
+	'./ex_list_cmds',
+	'./types'
 ], function(
-	ex_list_cmds
+	ex_list_cmds,
+	types
 ){
 'use strict';
 
+var TclError = types.TclError,
+	TclResult = types.TclResult;
+
 function install(interp) {
-	var TclError = interp.TclError;
 	if (interp.register_extension('ex_core_cmds')) {return;}
 
 	interp.registerCommand('set', function(args, interp){
@@ -18,6 +22,14 @@ function install(interp) {
 			return interp.get_var(args[1]);
 		}
 		return interp.set_var(args[1], args[2]);
+	});
+
+	interp.registerCommand('return', function(args, interp){
+		interp.checkArgs(args, [0, 1], '?value?');
+		if (args.length === 1) {
+			return new TclResult(types.RETURN, interp.get_var(args[1]));
+		}
+		return new TclResult(types.RETURN, '');
 	});
 
 	ex_list_cmds.install(interp);

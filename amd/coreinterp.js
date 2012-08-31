@@ -325,7 +325,7 @@ return function(/* extensions... */){
 	};
 
 	this.exec = function(commands, c_ok, c_err) {
-		var lastresult=null, self=this;
+		var lastresult=new TclResult(OK), self=this;
 
 		function eval_next(command){
 			if (command === undefined) {

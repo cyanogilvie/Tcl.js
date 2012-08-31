@@ -1,6 +1,7 @@
-jslint plusplus: true, white: true, nomen: true, newcap: true */
+/*jslint plusplus: true, white: true, nomen: true, newcap: true */
 /*global define */
-(['./types'], function(types){
+
+define(['./types'], function(types){
 "use strict";
 
 var iface, objtypes = {};

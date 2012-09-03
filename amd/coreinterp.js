@@ -61,11 +61,15 @@ return function(/* extensions... */){
 			throw new TclError('can\'t read "'+array+'('+index+')": variable isn\'t array',
 				'TCL', 'LOOKUP', 'VARNAME', array);
 		}
-		if (vinfo.value[index] === undefined) {
-			throw new TclError('can\'t read "'+array+'('+index+')": no such element in array',
-				'TCL', 'READ', 'VARNAME');
+		if (index !== undefined) {
+			if (vinfo.value[index] === undefined) {
+				throw new TclError('can\'t read "'+array+'('+index+')": no such element in array',
+					'TCL', 'READ', 'VARNAME');
+			}
+			return vinfo.value[index];
+		} else {
+			return vinfo.value;
 		}
-		return vinfo.value[index];
 	};
 
 	this.set_scalar = function(varname, value) {
@@ -342,9 +346,16 @@ return function(/* extensions... */){
 		}
 	};
 
+	this._getParseFromObj(obj) {
+		// TODO: as a new TclObject type 'parse', that caches the parsed
+		// script
+		return parser.parse_script(obj.GetString);
+	},
+
 	this.TclEval = function(script) {
-		var promise = new Promise();
-		this._trampoline(this.exec(parser.parse_script(script)[1], function(res){
+		var promise = new Promise(), parse;
+		parse = this._getParseFromObj(tclobj.AsObj(script));
+		this._trampoline(this.exec(parse[1], function(res){
 			promise.resolve(res);
 		}, function(err){
 			promise.reject(err);
@@ -352,7 +363,12 @@ return function(/* extensions... */){
 		return promise;
 	};
 
+	this.TclExpr = function(expr) {
+		throw new Error('Not implemented yet');
+	};
+
 	this['TclEval'] = this.TclEval;
+	this['TclExpr'] = this.TclExpr;
 	this['TclError'] = TclError;
 	this['TclResult'] = TclResult;
 	this['tclobj'] = tclobj;

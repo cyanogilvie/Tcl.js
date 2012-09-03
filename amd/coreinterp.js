@@ -67,9 +67,8 @@ return function(/* extensions... */){
 					'TCL', 'READ', 'VARNAME');
 			}
 			return vinfo.value[index];
-		} else {
-			return vinfo.value;
 		}
+		return vinfo.value;
 	};
 
 	this.set_scalar = function(varname, value) {
@@ -346,11 +345,11 @@ return function(/* extensions... */){
 		}
 	};
 
-	this._getParseFromObj(obj) {
+	this._getParseFromObj = function(obj) {
 		// TODO: as a new TclObject type 'parse', that caches the parsed
 		// script
-		return parser.parse_script(obj.GetString);
-	},
+		return parser.parse_script(obj.GetString());
+	};
 
 	this.TclEval = function(script) {
 		var promise = new Promise(), parse;

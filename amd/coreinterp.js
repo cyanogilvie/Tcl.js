@@ -93,7 +93,9 @@ return function(/* extensions... */){
 			throw new TclError('can\'t set "'+array+'('+index+')": variable isn\'t array',
 				'TCL', 'LOOKUP', 'VARNAME', array);
 		}
-		vinfo.value[index] = tclobj.AsObj(value);
+		if (index) {
+			vinfo.value[index] = tclobj.AsObj(value);
+		}
 		return value;
 	};
 

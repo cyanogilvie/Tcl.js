@@ -8,7 +8,7 @@ var problem_chars = /[ "{}$;\t\f\n\r\v\[\]]/,
 	hex_chars = /[\dabcdefABCDEF]/,
 	whitespace = /\s/,
 	true_values = ['1', 'yes', 'true', 'on'],
-	false_values = ['0', 'no', 'false', 'off'],
+	false_values = ['0', 'no', 'false', 'off'];
 
 // Exceptions <<<
 function ParseError(message) {
@@ -565,7 +565,7 @@ function complete(str) { //<<<
 
 //>>>
 function bool(str) { //<<<
-	var normstr = str.toLowerCase();
+	var normstr = str.toLowerCase(), i;
 
 	if (normstr === 'o') {throw new Error('Invalid boolean value "'+str+'"');}
 	for (i=0; i<true_values.length; i++) {
@@ -578,7 +578,7 @@ function bool(str) { //<<<
 			return false;
 		}
 	}
-	default: throw new Error('invalid boolean value "'+str+'"');
+	throw new Error('invalid boolean value "'+str+'"');
 }
 
 //>>>

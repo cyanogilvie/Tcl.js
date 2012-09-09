@@ -569,12 +569,12 @@ function bool(str) { //<<<
 
 	if (normstr === 'o') {throw new Error('Invalid boolean value "'+str+'"');}
 	for (i=0; i<true_values.length; i++) {
-		if (true_values.substr(0, normstr.length) === normstr) {
+		if (true_values[i].substr(0, normstr.length) === normstr) {
 			return true;
 		}
 	}
 	for (i=0; i<false_values.length; i++) {
-		if (false_values.substr(0, normstr.length) === normstr) {
+		if (false_values[i].substr(0, normstr.length) === normstr) {
 			return false;
 		}
 	}

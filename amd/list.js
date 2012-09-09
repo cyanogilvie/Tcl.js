@@ -6,7 +6,9 @@ define(['./types'], function(types){
 
 var problem_chars = /[ "{}$;\t\f\n\r\v\[\]]/,
 	hex_chars = /[\dabcdefABCDEF]/,
-	whitespace = /\s/;
+	whitespace = /\s/,
+	true_values = ['1', 'yes', 'true', 'on'],
+	false_values = ['0', 'no', 'false', 'off'],
 
 // Exceptions <<<
 function ParseError(message) {
@@ -562,6 +564,24 @@ function complete(str) { //<<<
 }
 
 //>>>
+function bool(str) { //<<<
+	var normstr = str.toLowerCase();
+
+	if (normstr === 'o') {throw new Error('Invalid boolean value "'+str+'"');}
+	for (i=0; i<true_values.length; i++) {
+		if (true_values.substr(0, normstr.length) === normstr) {
+			return true;
+		}
+	}
+	for (i=0; i<false_values.length; i++) {
+		if (false_values.substr(0, normstr.length) === normstr) {
+			return false;
+		}
+	}
+	default: throw new Error('invalid boolean value "'+str+'"');
+}
+
+//>>>
 
 return {
 	list2array:			parse_tcl_list,
@@ -572,7 +592,8 @@ return {
 	list2dict:			list2dict,
 	dict2list:			dict2list,
 	to_tcl:				to_tcl,
-	complete:			complete
+	complete:			complete,
+	bool:				bool
 };
 
 });

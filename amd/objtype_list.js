@@ -12,6 +12,8 @@ function ListObj(value) {
 
 	if (value instanceof Array) {
 		this['jsval'] = value.slice(0);
+	} else if (value === undefined) {
+		this['jsval'] = [];
 	} else {
 		// TODO: be stricter?
 		this['jsval'] = [value];

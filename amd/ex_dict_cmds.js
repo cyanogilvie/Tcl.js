@@ -8,7 +8,8 @@ define([
 	'cflib/promise',
 	'cflib/tailcall',
 
-	'./objtype_dict'
+	'./objtype_dict',
+	'./objtype_list'
 ], function(
 	tcllist,
 	types,

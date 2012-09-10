@@ -46,6 +46,20 @@ return function(/* extensions... */){
 		return vinfo;
 	};
 
+	this.var_exists = function(varname) {
+		return this.vars[varname] !== undefined;
+	};
+
+	this.scalar_exists = function(varname) {
+		return	this.vars[varname] !== undefined &&
+				this.vars[varname].type === SCALAR;
+	};
+
+	this.array_exists = function(varname) {
+		return	this.vars[varname] !== undefined &&
+				this.vars[varname].type === ARRAY;
+	};
+
 	this.get_scalar = function(varname) {
 		var vinfo = this.resolve_var(varname);
 		if (vinfo.type === ARRAY) {
@@ -157,7 +171,7 @@ return function(/* extensions... */){
 		var min, max;
 		if (count instanceof Array) {
 			min = count[0];
-			max = count[1];
+			max = count[1] || 9007199254740992;	// javascript maxint
 		} else {
 			min = count;
 			max = count;
@@ -375,6 +389,9 @@ return function(/* extensions... */){
 	this['tclobj'] = tclobj;
 	this['registerCommand'] = this.registerCommand;
 	this['checkArgs'] = this.checkArgs;
+	this['var_exists'] = this.var_exists;
+	this['scalar_exists'] = this.scalar_exists;
+	this['array_exists'] = this.array_exists;
 	this['get_var'] = this.get_var;
 	this['get_scalar'] = this.get_scalar;
 	this['get_array'] = this.get_array;

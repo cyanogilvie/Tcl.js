@@ -4,7 +4,7 @@ define(function(){
 'use strict';
 
 function TclError(message) {
-	var errorcode = Array.prototype.slice(arguments, 1);
+	var errorcode = Array.prototype.slice.call(arguments, 1);
 	this.name = 'TclError';
 	this.errorcode = errorcode.length !== 0 ? errorcode : ['NONE'];
 	this.message = message;
@@ -13,8 +13,9 @@ TclError.prototype = new Error();
 
 function TclResult(code, result, options) {
 	this.code = code;
-	this.result = result || '';
-	this.options = options;
+	this.result = result !== undefined ? result : '';
+	this.options = options || {};
+	this.options.code = code;
 	this.toString = function(){
 		return this.result.toString();
 	};

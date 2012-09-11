@@ -295,7 +295,9 @@ return function(/* extensions... */){
 
 		function normalize_result(result) {
 			if (!(result instanceof TclResult)) {
-				if (result instanceof Error) {
+				if (result instanceof TclError) {
+					result = new TclResult(ERROR, result, {errorcode: result.errorcode});
+				} else if (result instanceof Error) {
 					result = new TclResult(ERROR, tclobj.NewString(result));
 				} else {
 					result = new TclResult(OK, result);

@@ -339,8 +339,8 @@ return function(/* extensions... */){
 		});
 	};
 
-	this.exec = function(a_commands, c_ok, c_err) {
-		var lastresult=new TclResult(OK), self=this, commands = a_commands.slice();
+	this.exec = function(commands, c_ok, c_err) {
+		var lastresult=new TclResult(OK), self=this;
 
 		function eval_next(command){
 			if (command === undefined) {
@@ -372,8 +372,8 @@ return function(/* extensions... */){
 
 	this.TclEval = function(script) {
 		var promise = new Promise(), parse;
-		parse = tclobj.AsObj(script).GetParsedScript();
-		this._trampoline(this.exec(parse[1], function(res){
+		parse = tclobj.AsObj(script).GetExecParse();
+		this._trampoline(this.exec(parse[1].slice(), function(res){
 			promise.resolve(res);
 		}, function(err){
 			promise.reject(err);

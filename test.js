@@ -58,10 +58,14 @@ require([
 	}
 	function run(script) {
 		var interp = new TclInterp(),
-			commands = tclobj.AsObj(script).GetParsedScript(), node, outputnode;
+			obj = tclobj.AsObj(script),
+			commands = obj.GetParsedScript(), node, outputnode;
 
 		domConstruct.create('pre', {
-			innerHTML: commands.join('\n')
+			innerHTML: '<h4>Raw Parse</h4>'+commands.join('\n')
+		}, 'output');
+		domConstruct.create('pre', {
+			innerHTML: '<h4>Exec Parse</h4>'+obj.GetExecParse().join('\n')
 		}, 'output');
 		node = domConstruct.create('pre', {}, 'output');
 		show_script(commands[1], node);
@@ -138,6 +142,8 @@ require([
 		run('#comment 1\nset a(foo) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(foo))"');
 	});
 	scriptobj = tclobj.AsObj('#comment 1\nset o 0;set a(fo0\\ o) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(f[say_o]${o} o)), again: (${a(fo0 o)})"\nputs [bar]; set x {final result};');
+	scriptobj.GetParsedScript();
+	console.log('scriptobj tostring: ('+scriptobj.toString()+')');
 	query('#test6').on('click', function(){
 		run(scriptobj);
 	});

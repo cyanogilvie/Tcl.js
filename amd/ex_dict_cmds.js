@@ -33,7 +33,7 @@ objkeys = Object.prototype.keys ? function(o){return o.keys();} : function(o){
 
 function resolve_keypath(interp, dictobj, keys, create, dictvar) {
 	var key, lastdict = dictobj, root;
-	if (create === undefined) {create = true;}
+	if (create === undefined) {create = false;}
 	if (dictvar !== undefined && dictobj.IsShared()) {
 		dictobj = dictobj.DuplicateObj();
 		interp.set_scalar(dictvar, dictobj);
@@ -54,7 +54,7 @@ function resolve_keypath(interp, dictobj, keys, create, dictvar) {
 				lastdict[key].IncrRefCount();
 			} else if (keys.length > 0) {
 				throw new TclError('key "'+key+'" not known in dictionary',
-					['TCL', 'LOOKUP', 'DICT', key]);
+					'TCL', 'LOOKUP', 'DICT', key);
 			}
 		}
 		dictobj = lastdict[key];
@@ -102,7 +102,7 @@ subcmds = {
 		return dictobj;
 	},
 	create: function(args){
-		return new tclobj.NewDict(args);
+		return new tclobj.NewDict(args.slice(1));
 	},
 	exists: function(args){
 		this.checkArgs(args, [3, null], 'dictionaryValue key ?key ...? value');
@@ -143,7 +143,7 @@ subcmds = {
 				keyvar, valuevar, pairs = [], promise;
 			interp.checkArgs(args, 2, 'dictionaryValue script {keyVar valueVar} script');
 			if (loopvars.length !== 2) {
-				throw new TclError('must have exactly two variable names', ['NONE']);
+				throw new TclError('must have exactly two variable names');
 			}
 			keyvar = loopvars[0];
 			valuevar = loopvars[1];
@@ -207,7 +207,7 @@ subcmds = {
 			case 'key': return filter_key();
 			case 'script': return filter_script();
 			case 'value': return filter_value();
-			default: throw new TclError('bad filterType "'+filterType+'": must be key, script, or value', ['TCL', 'LOOKUP', 'INDEX', 'filterType', filterType]);
+			default: throw new TclError('bad filterType "'+filterType+'": must be key, script, or value', 'TCL', 'LOOKUP', 'INDEX', 'filterType', filterType);
 		}
 	},
 	'for': function(args, interp){
@@ -218,7 +218,7 @@ subcmds = {
 			body = args.shift(),
 			keyvar, valuevar, e, pairs = [], promise;
 		if (loopvars.length !== 2) {
-			throw new TclError('must have exactly two variable names', ['NONE']);
+			throw new TclError('must have exactly two variable names');
 		}
 		keyvar = loopvars[0];
 		valuevar = loopvars[1];
@@ -261,6 +261,10 @@ subcmds = {
 		var dictobj = args.shift(),
 			keys = args,
 			kinfo = resolve_keypath(this, dictobj, keys);
+		if (kinfo.value === undefined) {
+			throw new TclError('key "'+kinfo.key+'" not known in dictionary',
+				'TCL', 'LOOKUP', 'DICT', kinfo.key);
+		}
 		return kinfo.value;
 	},
 	incr: function(args){
@@ -330,7 +334,7 @@ subcmds = {
 			body = args.shift(),
 			keyvar, valuevar, e, pairs = [], promise, accum = [];
 		if (loopvars.length !== 2) {
-			throw new TclError('must have exactly two variable names', ['NONE']);
+			throw new TclError('must have exactly two variable names');
 		}
 		keyvar = loopvars[0];
 		valuevar = loopvars[1];
@@ -404,7 +408,7 @@ subcmds = {
 		if (pairs.length === 0) {return dictobj;}
 		if (pairs.length % 2 !== 0) {
 			throw new TclError('wrong # args: should be "dict replace dictionary ?key value ...?"',
-				['TCL', 'WRONGARGS']);
+				'TCL', 'WRONGARGS');
 		}
 		dictobj = dictobj.DuplicateObj();
 		dictval = dictobj.GetDict();
@@ -462,7 +466,7 @@ subcmds = {
 			dictval, vars, i, promise;
 		if (pairs.length % 2 !== 0) {
 			throw new TclError('wrong # args: should be "dict update varName key varName ?key varName ...? script"',
-				['TCL', 'WRONGARGS']);
+				'TCL', 'WRONGARGS');
 		}
 		if (dictobj.IsShared()) {
 			dictobj = dictobj.DuplicateObj();
@@ -621,7 +625,7 @@ function install(interp) {
 		args.unshift(cmd+' '+subcmd);
 		if (subcmds[subcmd] === undefined) {
 			throw new TclError('unknown or ambiguous subcommand "'+subcmd+'": must be '+objkeys(subcmds).join(', '),
-				['TCL', 'LOOKUP', 'SUBCOMMAND', subcmd]);
+				'TCL', 'LOOKUP', 'SUBCOMMAND', subcmd);
 		}
 		return subcmds[subcmd].apply(interp, [args, interp]);
 	});

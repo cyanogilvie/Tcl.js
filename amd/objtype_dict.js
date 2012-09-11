@@ -78,7 +78,7 @@ function DictObj(value) {
 			throw new Error('Cannot convert array with odd number of elements to a dict');
 		}
 		this.jsval = {};
-		for (i=0; i<value.length; i++) {
+		for (i=0; i<value.length; i+=2) {
 			this.jsval[value[i]] = tclobj.AsObj(value[i+1]);
 			this.jsval[value[i]].IncrRefCount();
 		}
@@ -90,6 +90,10 @@ function DictObj(value) {
 				this.jsval[e].IncrRefCount();
 			}
 		}
+	} else if (value === undefined) {
+		this.jsval = {};
+	} else {
+		throw new Error('Cannot create dictionary from "'+value+'"');
 	}
 }
 DictObj.prototype = new tclobj.TclObject();

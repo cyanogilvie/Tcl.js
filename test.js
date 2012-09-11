@@ -122,7 +122,7 @@ require([
 			domConstruct.create('span', {className: 'tclresult', innerHTML: result.result+'\n'}, outputnode);
 		}, function(err){
 			console.log('Got error: ', err, ': "'+err+'"');
-			domConstruct.create('span', {className: 'tclerror', innerHTML: result.result+'\n'}, outputnode);
+			domConstruct.create('span', {className: 'tclerror', innerHTML: err.result+'\n'}, outputnode);
 		});
 		console.log('TclEval returned');
 	}
@@ -158,5 +158,11 @@ require([
 	});
 	query('#test10').on('click', function(){
 		run('set d {a A b B c C}; dict merge {x X a oldA y Y c oldC} $d');
+	});
+	query('#test11').on('click', function(){
+		run('set d [dict create a A b B c C]; dict merge {x X a oldA y Y c oldC} $d');
+	});
+	query('#test12').on('click', function(){
+		run('puts [dict exists {a {b B} c C} a b]; puts [dict exists {a {a B} c C} a x]');
 	});
 });

@@ -94,7 +94,11 @@ return function(/* extensions... */){
 			throw new TclError('can\'t set "'+varname+'": variable is array',
 				'TCL', 'WRITE', 'VARNAME');
 		}
+		if (vinfo.value !== undefined) {
+			vinfo.value.DecrRefCount();
+		}
 		vinfo.value = tclobj.AsObj(value);
+		vinfo.value.IncrRefCount();
 		return value;
 	};
 
@@ -108,7 +112,11 @@ return function(/* extensions... */){
 				'TCL', 'LOOKUP', 'VARNAME', array);
 		}
 		if (index) {
+			if (vinfo.value[index] !== undefined) {
+				vinfo.value[index].DecrRefCount();
+			}
 			vinfo.value[index] = tclobj.AsObj(value);
+			vinfo.value[index].IncrRefCount();
 		}
 		return value;
 	};

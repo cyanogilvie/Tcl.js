@@ -1,37 +1,50 @@
 /*jslint plusplus: true, white: true, nomen: true */
 /*global define */
 
-define(['./tclobject'], function(tclobj){
-"use strict";
+define([
+	'./tclobject',
+	'./types'
+], function(
+	tclobj,
+	types
+){
+'use strict';
 
-function IntObj(value) {
-	this['type'] = 'int';
-	this['dupJsVal'] = function(){
-		return this['jsval'];
-	};
-
-	// TODO: force integer (not float)
-	this['jsval'] = Number(value);
-	this['updateString'] = String(this['jsval']);
-	this['setFromAny'] = function(obj){
-		obj.updateString();
+var inthandlers = {
+	type: 'int',
+	dupJsVal: function(){
+		return this.jsval;
+	},
+	updateString: function(obj){
+		obj.bytes = String(obj.jsval);
+	},
+	setFromAny: function(obj){
+		obj.handlers.updateString(obj);
+		obj.FreeJsVal();
 		obj.jsval = Number(obj.bytes);
 		obj.bytes = null;
-		obj.prototype = this;
-	};
+		obj.handlers = inthandlers;
+	}
+};
+
+function IntObj(value) {
+	this.handlers = inthandlers;
+
+	// TODO: force integer (not float)
+	this.jsval = Number(value);
 }
 IntObj.prototype = new tclobj.TclObject();
 
-tclobj.RegisterObjType('int', IntObj);
+tclobj.RegisterObjType('int', inthandlers);
 
-tclobj['GetInt'] = function(obj){
-	if (obj.prototype !== IntObj) {
-		tclobj.ConvertToType('int', obj);
+types.TclObjectBase.GetInt = function(){
+	if (this.handlers !== inthandlers) {
+		this.ConvertToType('int');
 	}
-	return obj['jsval'];
+	return this.jsval;
 };
 
-tclobj['NewInt'] = function(val){
+tclobj.NewInt = function(val){
 	return new IntObj(val);
 };
 

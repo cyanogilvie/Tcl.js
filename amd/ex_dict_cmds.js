@@ -369,9 +369,11 @@ subcmds = {
 		return promise;
 	},
 	merge: function(args){
-		var out = {}, e, dictval;
+		var out = {}, e, dictval, arg;
+		args.shift();
 		while (args.length) {
-			dictval = args.shift().GetDict();
+			arg = args.shift();
+			dictval = arg.GetDict();
 			for (e in dictval) {
 				if (dictval.hasOwnProperty(e)) {
 					out[e] = dictval[e];
@@ -429,7 +431,7 @@ subcmds = {
 		}
 		kinfo.lastdict[kinfo.key] = tclobj.AsObj(value);
 		kinfo.lastdict[kinfo.key].IncrRefCount();
-		return value;
+		return dictobj;
 	},
 	size: function(args){
 		this.checkArgs(1, 'dictionaryValue');
@@ -621,7 +623,7 @@ function install(interp) {
 			throw new TclError('unknown or ambiguous subcommand "'+subcmd+'": must be '+objkeys(subcmds).join(', '),
 				['TCL', 'LOOKUP', 'SUBCOMMAND', subcmd]);
 		}
-		return subcmd[subcmds].apply(interp, [args, interp]);
+		return subcmds[subcmd].apply(interp, [args, interp]);
 	});
 }
 

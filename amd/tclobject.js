@@ -4,27 +4,94 @@
 define(['./types'], function(types){
 "use strict";
 
-var iface, objtypes = {};
+var iface, objtypes = {}, TclObjectBase, jsvalhandlers, NewObj;
 
-function RegisterObjType(type, objclass) {
+jsvalhandlers = {
+	type: 'jsval',
+	freeJsVal: function(obj){
+		obj.jsval = null;
+	},
+	dupJsVal: function(obj){
+		// TODO: clone jsval
+	},
+	updateString: function(obj){
+		obj.bytes = obj.jsval.toString();
+	},
+	updateJsVal: function(){},
+	setFromAny: function(obj){
+		obj.updateJsVal();
+		obj.bytes = null;
+		obj.handlers = jsvalhandlers;
+	}
+};
+
+TclObjectBase = {
+	IncrRefCount: function(){
+		this.refCount++;
+	},
+	DecrRefCount: function(){
+		if (--this.refCount <= 0) {
+			this.FreeJsVal();
+		}
+	},
+	FreeJsVal: function(){
+		if (this.handlers.freeJsVal) {
+			this.handlers.freeJsVal(this);
+		}
+	},
+	toString: function(){
+		if (this.bytes === null) {
+			this.handlers.updateString(this);
+		}
+		return this.bytes;
+	},
+	GetString: function(){
+		return this.toString();
+	},
+	DuplicateObj: function(){
+		if (this.jsval === null) {
+			this.handlers.updateJsVal(this);
+		}
+		return NewObj([this.type], this.handlers.dupJsVal(this));
+	},
+	IsShared: function(){
+		return this.refCount > 1;
+	},
+	GetJsVal: function(){
+		if (this.jsval === null) {
+			this.handlers.updateJsVal(this);
+		}
+		return this.jsval;
+	},
+	ConvertToType: function(type){
+		if (this.handlers.type === type) {return;}
+		objtypes[type].setFromAny(this);
+		this.handlers = objtypes[type];
+	}
+};
+
+function RegisterObjType(type, handlers) {
 	if (objtypes[type] !== undefined) {
 		throw new Error('ObjType "'+type+'" already registered');
 	}
-	objtypes[type] = objclass;
+	objtypes[type] = handlers;
 }
 
-function ConvertToType(interp, obj, type) {
-	if (obj.type === type) {return;}
-	if (objtypes[type].prototype['setFromAny'] === null) {
-		throw new Error('Cannot convert to "'+type+'", missing setFromAny method');
+function TclObject() {
+	this.handlers = jsvalhandlers;
+	this.jsval = null;
+	this.refCount = 0;
+	this.bytes = null;
+}
+TclObject.prototype = TclObjectBase;
+
+NewObj = function(type, value) {
+	var obj;
+	if (type === undefined) {
+		type = 'auto';
 	}
-	objtypes[type].prototype['setFromAny'](interp, obj);
-}
-
-function NewObj(type /* args... */) {
-	var a = Array.prototype.slice.call(arguments, 1);
 	if (type === 'auto') {
-		if (type instanceof Array) {
+		if (value instanceof Array) {
 			type = 'list';
 		} else {
 			type = 'jsval';
@@ -33,61 +100,16 @@ function NewObj(type /* args... */) {
 	if (objtypes[type] === undefined) {
 		throw new Error('ObjType not registered: "'+type+'"');
 	}
-	return new objtypes[type](a[0], a[1], a[2], a[3], a[4]);	// blegh
-}
+	obj = new TclObject();
+	obj.jsval = value;
+	obj.ConvertToType(type);
+	return obj;
+};
 
-function TclObject(value) {
-	var refcount = 0;
-
-	this['type'] = 'jsval';
-	this['jsval'] = value === undefined ? null : value;
-	this['freeJsVal'] = function(){this.jsval = null;};
-	this['dupJsVal'] = function(){
-		// TODO: clone jsval
-	};
-	this['refcount'] = refcount;
-	this['bytes'] = null;
-	this['updateString'] = function(){this.bytes = this.jsval.toString();};
-	this['updateJsVal'] = function(){};
-	this['setFromAny'] = function(obj){
-		obj['updateJsVal']();
-		obj.bytes = null;
-		obj.prototype = this;
-	};
-	this['incrRefCount'] = function(){this['refCount']++;};
-	this['decrRefCount'] = function(){
-		if (--this['refcount'] <= 0) {
-			if (this['freeJsVal']) {
-				this['freeJsVal']();
-			}
-		}
-	};
-	this['GetString'] = function(){
-		if (this['bytes'] === null) {
-			this['updateString']();
-		}
-		return this['bytes'];
-	};
-	this['DuplicateObj'] = function(){
-		if (this['jsval'] === null) {
-			this['updateJsVal']();
-		}
-		return NewObj([this['type']], this['dupJsVal'](this['jsval']));
-	};
-	this['IsShared'] = function(){return this['refcount'] > 1;};
-	this['GetJsVal'] = function(){
-		if (this['jsval'] === null) {
-			this['updateJsVal']();
-		}
-		return this['jsval'];
-	};
-	this['toString'] = function(){
-		return this['GetString']();
-	};
-}
 types.TclObject = TclObject;
+types.TclObjectBase = TclObjectBase;
 
-RegisterObjType('jsval', TclObject);
+RegisterObjType('jsval', jsvalhandlers);
 
 iface = {
 	'TclObject': TclObject,
@@ -95,14 +117,7 @@ iface = {
 	'NewObj': NewObj,
 	'NewString': function(value){return NewObj('jsval', String(value));},
 	'AsObj': function(value){return value instanceof TclObject ? value : NewObj('auto', value);},
-	'AsVal': function(value){return value instanceof TclObject ? value.GetJsVal() : value;},
-	'ConvertToType': ConvertToType,
-	'GetString': function(obj){return obj['GetString'];},
-	'GetJsVal': function(obj){return obj['GetJsVal'];},
-	'DuplicateObj': function(obj){return obj['DuplicateObj'];},
-	'IsShared': function(obj){return obj['IsShared'];},
-	'IncrRefCount': function(obj){obj.incrRefCount();},
-	'DecrRefCount': function(obj){obj.decrRefCount();}
+	'AsVal': function(value){return value instanceof TclObject ? value.GetJsVal() : value;}
 };
 
 return iface;

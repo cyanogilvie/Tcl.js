@@ -3,9 +3,11 @@
 
 define([
 	'./ex_list_cmds',
+	'./ex_dict_cmds',
 	'./types'
 ], function(
 	ex_list_cmds,
+	ex_dict_cmds,
 	types
 ){
 'use strict';
@@ -33,6 +35,7 @@ function install(interp) {
 	});
 
 	ex_list_cmds.install(interp);
+	ex_dict_cmds.install(interp);
 }
 
 return {'install': install};

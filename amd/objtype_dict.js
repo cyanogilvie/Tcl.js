@@ -1,47 +1,43 @@
 /*jslint plusplus: true, white: true, nomen: true */
 /*global define */
 
-define(['./tclobject', './list'], function(tclobj, list){
-"use strict";
+define([
+	'./tclobject',
+	'./types',
+	'./list'
+], function(
+	tclobj,
+	types,
+	list
+){
+'use strict';
 
-function from_string(str){
-	var d = {};
-
-	return d;
-}
-
-function DictObj(value) {
-	var e, d;
-
-	this['type'] = 'dict';
-	this['dupJsVal'] = function(){
-		return from_string(this.GetString());
-	};
-
-	if (value instanceof Array) {
-		this['jsval'] = value.slice(0);
-	} else if (typeof value === 'object') {
-		d = {};
-		for (e in value) {
-			if (value.hasOwnProperty(e)) {
-				d[e] = tclobj.NewObj('auto', value[e]);
+var dicthandlers = {
+	type: 'dict',
+	dupJsVal: function(obj){
+		var newval = {}, e;
+		for (e in obj.jsval) {
+			if (obj.jsval.hasOwnProperty(e)) {
+				newval[e] = obj.jsval[e];
 			}
 		}
-	}
-	this['updateString'] = function(){
+		return newval;
+		//return from_string(obj.GetString());
+	},
+	updateString: function(obj){
 		var e, a = [];
-		for (e in this['jsval']) {
-			if (this['jsval'].hasOwnProperty(e)) {
+		for (e in obj.jsval) {
+			if (obj.jsval.hasOwnProperty(e)) {
 				a.push(e);
-				a.push(this['jsval'][e].GetString());
+				a.push(obj.jsval[e].GetString());
 			}
 		}
-		return list.array2list(a);
-	};
-	this['setFromAny'] = function(obj){
-		var i, jsval = obj['jsval'], a;
+		obj.bytes = list.array2list(a);
+	},
+	setFromAny: function(obj){
+		var i, jsval = obj.jsval, a, d = {};
 		if (jsval === null) {
-			obj['updateJsVal']();
+			obj.handlers.updateJsVal(obj);
 		}
 		if (!(jsval instanceof Array)) {
 			switch (typeof jsval) {
@@ -61,31 +57,53 @@ function DictObj(value) {
 			}
 		}
 		if (a.length % 2 !== 0) {
-			throw new Error('No value for key: "'+a[a.length-1]+'"')
+			throw new Error('No value for key: "'+a[a.length-1]+'"');
 		}
 		for (i=0; i<a.length; i+=2) {
-			if (!(a[i+1] instanceof tclobj.TclObject)) {
-				a[i+1] = tclobj.NewObj('auto', a[i+1]);
+			d[a[i]] = tclobj.AsObj(a[i+1]);
+		}
+		obj.FreeJsVal();
+		obj.jsval = d;
+		obj.bytes = null;
+		obj.handlers = dicthandlers;
+	}
+};
+
+function DictObj(value) {
+	var e, i;
+
+	this.handlers = dicthandlers;
+	if (value instanceof Array) {
+		if (value.length % 2 !== 0) {
+			throw new Error('Cannot convert array with odd number of elements to a dict');
+		}
+		this.jsval = {};
+		for (i=0; i<value.length; i++) {
+			this.jsval[value[i]] = tclobj.AsObj(value[i+1]);
+			this.jsval[value[i]].IncrRefCount();
+		}
+	} else if (typeof value === 'object') {
+		this.jsval = {}
+		for (e in value) {
+			if (value.hasOwnProperty(e)) {
+				this.jsval[e] = tclobj.AsObj(value[e]);
+				this.jsval[e].IncrRefCount();
 			}
 		}
-		obj.freeJsVal();
-		obj.jsval = a;
-		obj.bytes = null;
-		obj.prototype = this;
-	};
+	}
 }
 DictObj.prototype = new tclobj.TclObject();
 
-tclobj.RegisterObjType('dict', DictObj);
+tclobj.RegisterObjType('dict', dicthandlers);
 
-tclobj['GetDict'] = function(obj){
-	if (obj.prototype !== DictObj) {
-		tclobj.ConvertToType('dict', obj);
+types.TclObjectBase.GetDict = function(){
+	if (this.handlers !== dicthandlers) {
+		this.ConvertToType('dict');
 	}
-	return obj['jsval'];
+	return this.jsval;
 };
 
-tclobj['NewDict'] = function(val){
+tclobj.NewDict = function(val){
 	return new DictObj(val);
 };
 

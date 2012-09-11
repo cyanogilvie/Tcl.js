@@ -110,8 +110,10 @@ require([
 		});
 		interp.TclEval(script).then(function(result){
 			console.log('Got ok: ', result, ' string concat: "'+result.result+'"');
+			domConstruct.create('span', {className: 'tclresult', innerHTML: result.result+'\n'}, outputnode);
 		}, function(err){
 			console.log('Got error: ', err, ': "'+err+'"');
+			domConstruct.create('span', {className: 'tclerror', innerHTML: result.result+'\n'}, outputnode);
 		});
 		console.log('TclEval returned');
 	}
@@ -132,5 +134,17 @@ require([
 	});
 	query('#test6').on('click', function(){
 		run('#comment 1\nset o 0;set a(fo0\\ o) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(f[say_o]${o} o)), again: (${a(fo0 o)})"\nputs [bar]; set x {final result}');
+	});
+	query('#test7').on('click', function(){
+		run('set d {a A b B c C}; dict get $d b');
+	});
+	query('#test8').on('click', function(){
+		run('set d {a A b B c C}; dict keys $d');
+	});
+	query('#test9').on('click', function(){
+		run('set d {a A b B c C}; dict set d b Updated; set d');
+	});
+	query('#test10').on('click', function(){
+		run('set d {a A b B c C}; dict merge {x X a oldA y Y c oldC} $d');
 	});
 });

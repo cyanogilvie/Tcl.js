@@ -385,24 +385,11 @@ return function(/* extensions... */){
 		throw new Error('Not implemented yet');
 	};
 
-	this['TclEval'] = this.TclEval;
-	this['TclExpr'] = this.TclExpr;
-	this['TclError'] = TclError;
-	this['TclResult'] = TclResult;
-	this['tclobj'] = tclobj;
-	this['registerCommand'] = this.registerCommand;
-	this['checkArgs'] = this.checkArgs;
-	this['var_exists'] = this.var_exists;
-	this['scalar_exists'] = this.scalar_exists;
-	this['array_exists'] = this.array_exists;
-	this['get_var'] = this.get_var;
-	this['get_scalar'] = this.get_scalar;
-	this['get_array'] = this.get_array;
-	this['set_var']  = this.set_var;
-	this['set_scalar']  = this.set_scalar;
-	this['set_array']  = this.set_array;
+	this.TclError = TclError;
+	this.TclResult = TclResult;
+	this.tclobj = tclobj;
 
-	this['register_extension'] = function(ex) {
+	this.register_extension = function(ex) {
 		if (this.extensions[ex] === undefined) {
 			this.extensions[ex] = true;
 			return false;

@@ -4,17 +4,22 @@
 require([
 	'tcl/parser',
 	'tcl/interp',
+	'tcl/tclobject',
 	'cflib/promise',
 	'dojo/dom-construct',
 	'dojo/query'
 ], function(
 	parser,
 	TclInterp,
+	tclobj,
 	Promise,
 	domConstruct,
 	query
 ) {
 	"use strict";
+
+	var scriptobj;
+
 	function show_script(commands, node) {
 		var command, first, word, i, j;
 		function show_tokens(tokens, tnode, isscript) {
@@ -53,7 +58,7 @@ require([
 	}
 	function run(script) {
 		var interp = new TclInterp(),
-			commands = parser.parse_script(script), node, outputnode;
+			commands = tclobj.AsObj(script).GetParsedScript(), node, outputnode;
 
 		domConstruct.create('pre', {
 			innerHTML: commands.join('\n')
@@ -132,8 +137,9 @@ require([
 	query('#test5').on('click', function(){
 		run('#comment 1\nset a(foo) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(foo))"');
 	});
+	scriptobj = tclobj.AsObj('#comment 1\nset o 0;set a(fo0\\ o) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(f[say_o]${o} o)), again: (${a(fo0 o)})"\nputs [bar]; set x {final result};');
 	query('#test6').on('click', function(){
-		run('#comment 1\nset o 0;set a(fo0\\ o) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(f[say_o]${o} o)), again: (${a(fo0 o)})"\nputs [bar]; set x {final result}');
+		run(scriptobj);
 	});
 	query('#test7').on('click', function(){
 		run('set d {a A b B c C}; dict get $d b');

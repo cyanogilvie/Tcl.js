@@ -9,7 +9,8 @@ define([
 	'cflib/promise',
 	'cflib/tailcall',
 
-	'./objtype_list'
+	'./objtype_list',
+	'./objtype_script'
 ], function(
 	parser,
 	tclobj,
@@ -230,7 +231,7 @@ return function(/* extensions... */){
 					break;
 
 				case parser.INDEX:
-					return new TailCall(self.resolve_word, [token[1], function(indexwords){
+					return new TailCall(self.resolve_word, [token[1].slice(), function(indexwords){
 						index = indexwords.join('');
 						parts.push(self.get_array(array, index));
 						array = null;
@@ -240,7 +241,7 @@ return function(/* extensions... */){
 					}], self);
 
 				case parser.SCRIPT:
-					return new TailCall(self.exec, [token[1], function(result){
+					return new TailCall(self.exec, [token[1].slice(), function(result){
 						parts.push(result.result);
 						return new TailCall(callnext, [tokens.shift()]);
 					}, function(err){
@@ -275,7 +276,7 @@ return function(/* extensions... */){
 				return c_ok(sofar);
 			}
 
-			return new TailCall(self.resolve_word, [next, function(addwords){
+			return new TailCall(self.resolve_word, [next.slice(), function(addwords){
 				var i;
 				for (i=0; i<addwords.length; i++) {
 					sofar.push(addwords[i]);
@@ -310,7 +311,7 @@ return function(/* extensions... */){
 			return c(normalize_result(result));
 		}
 
-		return this.get_words(commandline, function(words){
+		return this.get_words(commandline.slice(), function(words){
 			if (words.length === 0) {
 				return c(null);
 			}
@@ -338,8 +339,8 @@ return function(/* extensions... */){
 		});
 	};
 
-	this.exec = function(commands, c_ok, c_err) {
-		var lastresult=new TclResult(OK), self=this;
+	this.exec = function(a_commands, c_ok, c_err) {
+		var lastresult=new TclResult(OK), self=this, commands = a_commands.slice();
 
 		function eval_next(command){
 			if (command === undefined) {
@@ -369,15 +370,9 @@ return function(/* extensions... */){
 		}
 	};
 
-	this._getParseFromObj = function(obj) {
-		// TODO: as a new TclObject type 'parse', that caches the parsed
-		// script
-		return parser.parse_script(obj.GetString());
-	};
-
 	this.TclEval = function(script) {
 		var promise = new Promise(), parse;
-		parse = this._getParseFromObj(tclobj.AsObj(script));
+		parse = tclobj.AsObj(script).GetParsedScript();
 		this._trampoline(this.exec(parse[1], function(res){
 			promise.resolve(res);
 		}, function(err){

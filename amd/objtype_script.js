@@ -12,23 +12,24 @@ define([
 ){
 'use strict';
 
-function tokens2string(tokens) {
-	var i, token, out = '';
-	for (i=0; i<tokens.length; i++) {
-		token = tokens[i];
-		if (token[0] === parser.SCRIPT) {
-			out += commands2string(token[1]);
-		} else if (token[0] === parser.INDEX) {
-			continue;
-		} else {
-			out += token[1];
-		}
-	}
-	return out;
-}
-
 function commands2string(commands) {
 	var i, j, out = '';
+
+	function tokens2string(tokens) {
+		var i, token, out = '';
+		for (i=0; i<tokens.length; i++) {
+			token = tokens[i];
+			if (token[0] === parser.SCRIPT) {
+				out += commands2string(token[1]);
+			} else if (token[0] === parser.INDEX) {
+				continue;
+			} else {
+				out += token[1];
+			}
+		}
+		return out;
+	}
+
 	for (i=0; i<commands.length; i++) {
 		for (j=0; j<commands[i].length; j++) {
 			out += tokens2string(commands[i][j]);
@@ -126,7 +127,7 @@ types.TclObjectBase.GetExecParse = function(){
 		this.jsval.exec_commands = [parser.SCRIPT, strip_for_exec(this.jsval.commands[1])];
 	}
 	return this.jsval.exec_commands;
-}
+};
 
 tclobj.NewScript = function(val){
 	return new ScriptObj(val);

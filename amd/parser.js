@@ -67,8 +67,9 @@ function ParseError(message) {
 }
 ParseError.prototype = new Error();
 
-function parse_script(text) {
-	var i, word, token = '', tokens, lasttoken, command = [], commands = [], matches;
+function parse(text, mode) {
+	var i = 0, word, token = '', tokens, lasttoken, command = [],
+		commands = [], matches;
 
 	function emit_waiting(type) {
 		if (token) {
@@ -373,29 +374,6 @@ function parse_script(text) {
 		}
 	}
 
-	i = 0;
-	// First unfold - happens even in brace quoted words
-	text = text.replace(/\\\n\s*/g, ' ');
-
-	while (true) {
-		word = get_word(command.length === 0, false);
-		command.push(word);
-		lasttoken = word[word.length-1];
-		if (lasttoken[0] === EOL) {
-			commands.push(command);
-			command = [];
-		} else if (lasttoken[0] === END) {
-			commands.push(command);
-			command = [];
-			break;
-		}
-	}
-	return [SCRIPT, commands];
-}
-
-function parse_expr(text) {
-	var i = 0, tokens;
-
 	function parse_subexpr(funcargs) {
 		var here, m, found, j;
 
@@ -510,8 +488,38 @@ function parse_expr(text) {
 		}
 	}
 
-	parse_subexpr();
-	return tokens;
+	switch (mode) {
+		case 'script':
+			while (true) {
+				word = get_word(command.length === 0, false);
+				command.push(word);
+				lasttoken = word[word.length-1];
+				if (lasttoken[0] === EOL) {
+					commands.push(command);
+					command = [];
+				} else if (lasttoken[0] === END) {
+					commands.push(command);
+					command = [];
+					break;
+				}
+			}
+			return [SCRIPT, commands];
+		case 'expr':
+			parse_subexpr();
+			return tokens;
+		default:
+			throw new Error('Invalid parse mode: "'+mode+'"');
+	}
+}
+
+function parse_script(text) {
+	// First unfold - happens even in brace quoted words
+	text = text.replace(/\\\n\s*/g, ' ');
+	return parse(text, 'script');
+}
+
+function parse_expr(text) {
+	return parse(text, 'expr');
 }
 
 iface = {

@@ -10,7 +10,8 @@ define([
 	'cflib/tailcall',
 
 	'./objtype_list',
-	'./objtype_script'
+	'./objtype_script',
+	'./objtype_expr'
 ], function(
 	parser,
 	tclobj,
@@ -29,7 +30,9 @@ var TclError = types.TclError,
 	ERROR = types.ERROR,
 	RETURN = types.RETURN,
 	BREAK = types.BREAK,
-	CONTINUE = types.CONTINUE;
+	CONTINUE = types.CONTINUE,
+	OPERATOR = parser.OPERATOR,
+	OPERAND = parser.OPERAND;
 
 return function(/* extensions... */){
 	var args = Array.prototype.slice.call(arguments), i;
@@ -383,8 +386,42 @@ return function(/* extensions... */){
 		return promise;
 	};
 
+	function eval_operator(op, args) {
+		var textargs = [], i;
+		for (i=0; i<args.length; i++) {
+			textargs.push(args[i][3]);
+		}
+		return [
+			OPERAND,
+			-1,
+			[op, args],
+			op[3]+'('+textargs.join(',')+')'
+		];
+	}
+
 	this.TclExpr = function(expr) {
-		throw new Error('Not implemented yet');
+		var P = tclobj.AsObj(expr).GetExprStack(), i, args, j, res, stack = [];
+		// Algorithm from Harry Hutchins http://faculty.cs.niu.edu/~hutchins/csci241/eval.htm
+		for (i=0; i<P.length; i++) {
+			switch (P[i][0]) {
+				case OPERAND:
+					stack.push(P[i]);
+					break;
+				case OPERATOR:
+					args = [];
+					j = P[i][2];
+					while (j--) {
+						args.push(stack.pop());
+					}
+					stack.push(eval_operator(P[i], args));
+					break;
+			}
+		}
+		res = stack.pop();
+		if (stack.length) {
+			throw new Error('Expr stack not empty at end of eval:', stack);
+		}
+		return res;
 	};
 
 	this.TclError = TclError;

@@ -129,7 +129,12 @@ require([
 	}
 
 	function expr(str) {
-		console.log('parser.parse_epr:', parser.parse_expr(str));
+		var parsed = parser.parse_expr(str),
+			interp = new TclInterp();
+		console.log('evaluating expression: {'+str+'}');
+		console.log('parser.parse_expr:', parsed);
+		console.log('stack:', parser.expr2stack(parsed));
+		console.log('result:', interp.TclExpr(str));
 	}
 
 	query('#test1').on('click', function(){

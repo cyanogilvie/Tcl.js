@@ -18,7 +18,8 @@ var iface, e,
 	SYNTAX	= 10,
 	OPERAND		= 11,
 	OPERATOR	= 12,
-	PARENTHESIS	= 13,
+	LPAREN		= 13,
+	RPAREN		= 13,
 	FLOAT		= 14,
 	INTEGER		= 15,
 	MATHFUNC	= 16,
@@ -42,7 +43,8 @@ var iface, e,
 
 		OPERAND		: OPERAND,
 		OPERATOR	: OPERATOR,
-		PARENTHESIS	: PARENTHESIS,
+		LPAREN		: LPAREN,
+		RPAREN		: RPAREN,
 		FLOAT		: FLOAT,
 		INTEGER		: INTEGER,
 		MATHFUNC	: MATHFUNC,
@@ -52,21 +54,21 @@ var iface, e,
 		QUOTED		: QUOTED,
 		BRACED		: BRACED
 	}, operators = [
-		/^[~!]/,
-		/^\*\*/,
-		/^[*\/%]/,
-		/^[\-+]/,
-		/^(?:<<|>>)/,
-		/^(?:<|>|<=|>=)/,
-		/^(?:==|!=)/,
-		/^(?:ne|eq)/,
-		/^(?:in|ni)/,
-		/^&(?!&)/,
-		/^\^/,
-		/^\|(?!\|)/,
-		/^&&/,
-		/^\|\|/,
-		/^[?:]/
+		/^[~!]/,			1,
+		/^\*\*/,			2,
+		/^[*\/%]/,			2,
+		/^[\-+]/,			2,
+		/^(?:<<|>>)/,		2,
+		/^(?:<|>|<=|>=)/,	2,
+		/^(?:==|!=)/,		2,
+		/^(?:ne|eq)/,		2,
+		/^(?:in|ni)/,		2,
+		/^&(?!&)/,			2,
+		/^\^/,				2,
+		/^\|(?!\|)/,		2,
+		/^&&/,				2,
+		/^\|\|/,			2,
+		/^[?:]/,			3
 	];
 
 function ParseError(message) {
@@ -448,16 +450,16 @@ function parse(text, mode) {
 			if (!expecting_operator) {
 				// Unitary + and -
 				if (m = /[\-+]/.exec(text[i])) {
-					emit_token(OPERATOR, m[0], 0);
+					emit_token(OPERATOR, m[0], 0, 1);
 					continue;
 				}
 			}
 
 			// operators, in decreasing precedence
 			found = false;
-			for (j=0; j<operators.length; j++) {
+			for (j=0; j<operators.length; j+=2) {
 				if (m = operators[j].exec(here)) {
-					emit_token(OPERATOR, m[0], j);
+					emit_token(OPERATOR, m[0], j, operators[j+1]);
 					found = true;
 					expecting_operator = false;
 					break;
@@ -506,13 +508,13 @@ function parse(text, mode) {
 				case '{': sub_parse(BRACED, parse_braced);		continue;
 				case '$': sub_parse(VAR, parse_variable);		continue;
 				case '[': sub_parse(SCRIPT, parse_commands);	continue;
-				case '(': emit_token(PARENTHESIS, text[i]);		continue;
+				case '(': emit_token(LPAREN, text[i]);			continue;
 				case ')':
 					if (funcargs) {
 						emit_token(SYNTAX, text[i]);
 						return;
 					}
-					emit_token(PARENTHESIS, text[i]);
+					emit_token(RPAREN, text[i]);
 					continue;
 			}
 			if (funcargs) {
@@ -579,9 +581,59 @@ function parse_expr(text) {
 	return parse(text, 'expr');
 }
 
+function expr2stack(expr) {
+	// Algorithm from Harry Hutchins http://faculty.cs.niu.edu/~hutchins/csci241/eval.htm
+	var P = [], i, stack = [], item;
+
+	for (i=0; i<expr.length; i++) {
+		switch (expr[i][0]) {
+			case OPERAND: P.push(expr[i]); break;
+			case LPAREN: stack.push(expr[i]); break;
+			case RPAREN: 
+				if (stack.length === 0) {
+					throw new Error('Unbalanced close parenthesis in expression');
+				}
+				while (stack.length && stack[stack.length-1][0] !== LPAREN) {
+					item = stack.pop();
+					if (item[0] === LPAREN) {
+						break;
+					}
+					P.push(item);
+				}
+				break;
+			case OPERATOR:
+				if (stack.length === 0 || stack[stack.length-1][0] === LPAREN) {
+					stack.push(expr[i]);
+				} else {
+					while (
+						stack.length &&
+						(item = stack[stack.length-1])[0] !== LPAREN &&
+						expr[i][1] > item[1]
+					) {
+						P.push(stack.pop());
+					}
+					stack.push(expr[i]);
+				}
+				break;
+			default:
+				if (console !== undefined) {
+					console.warn('Ignoring expr item:', expr[i]);
+				}
+		}
+	}
+	if (stack[stack.length-1][0] === LPAREN) {
+		throw new Error('Unbalanced open parenthesis in expression');
+	}
+	while (stack.length) {
+		P.push(stack.pop());
+	}
+	return P;
+}
+
 iface = {
 	'parse_script': parse_script,
 	'parse_expr': parse_expr,
+	'expr2stack': expr2stack,
 	'ParseError': ParseError,
 	'tokenname': {}
 };

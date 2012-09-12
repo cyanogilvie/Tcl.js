@@ -23,6 +23,10 @@ var iface, e,
 	INTEGER		= 15,
 	MATHFUNC	= 16,
 	BOOL		= 17,
+	EXPR		= 18,
+	ARG			= 19,
+	QUOTED		= 20,
+	BRACED		= 21,
 	t = {
 		TXT		: TXT,
 		SPACE	: SPACE,
@@ -42,7 +46,11 @@ var iface, e,
 		FLOAT		: FLOAT,
 		INTEGER		: INTEGER,
 		MATHFUNC	: MATHFUNC,
-		BOOL		: BOOL
+		BOOL		: BOOL,
+		EXPR		: EXPR,
+		ARG			: ARG,
+		QUOTED		: QUOTED,
+		BRACED		: BRACED
 	}, operators = [
 		/^[~!]/,
 		/^\*\*/,
@@ -57,7 +65,7 @@ var iface, e,
 		/^\^/,
 		/^\|(?!\|)/,
 		/^&&/,
-		/^||/,
+		/^\|\|/,
 		/^[?:]/
 	];
 
@@ -68,7 +76,7 @@ function ParseError(message) {
 ParseError.prototype = new Error();
 
 function parse(text, mode) {
-	var i = 0, word, token = '', tokens, lasttoken, command = [],
+	var i = 0, word, token = '', tokens = [], lasttoken, command = [],
 		commands = [], matches;
 
 	function emit_waiting(type) {
@@ -375,23 +383,89 @@ function parse(text, mode) {
 	}
 
 	function parse_subexpr(funcargs) {
-		var here, m, found, j;
+		var here, m, found, j, expecting_operator = false;
 
 		function emit_token(type, value, subtype, crep) {
 			if (value === undefined) {
 				value = '';
 			}
+			if (value.length === 0 && type !== END) {
+				throw new Error('Refusing to emit a token of length 0');
+			}
 			tokens.push([type, subtype, crep, value]);
 			i += value.length;
 		}
 
-		while (true) {
+		function parse_quoted() {
+			parse_combined(true, false);
+		}
+
+		function sub_parse(subtoken, func) {
+			var s_tokens = tokens.slice(), s_i = i, subtokens;
+			tokens = [];
+			func();
+			subtokens = tokens;
+			tokens = s_tokens;
+			emit_token(OPERAND, here.substr(0, i-s_i), subtoken, subtokens);
+		}
+
+		function sub_parse_arg() {
+			var s_tokens = tokens.slice(), s_i = i, e_i, subtokens;
+			tokens = [];
+			parse_subexpr(true);
+			subtokens = tokens;
+			tokens = s_tokens;
+			e_i = i;
+			i = s_i;
+			emit_token(EXPR, text.substr(i, e_i-i), ARG, subtokens);
+			return subtokens[subtokens.length-1][3];
+		}
+
+		function parse_mathfunc(funcname, space){
+			var s_i = i, e_i, s_tokens = tokens.slice(), term, subtokens;
+			tokens = [];
+			emit_token(MATHFUNC, funcname);
+			if (space) {emit_token(SPACE, space);}
+			emit_token(SYNTAX, '(');
+			do {
+				term = sub_parse_arg();
+			} while (term === ',');
+			subtokens = tokens;
+			tokens = s_tokens;
+			e_i = i;
+			i = s_i;
+			emit_token(OPERAND, text.substr(i, e_i-i), MATHFUNC, subtokens);
+		}
+
+		while (text[i] !== undefined) {
 			here = text.substr(i);
 			// whitespace
 			if (m = /^\s+/.exec(here)) {
 				emit_token(SPACE, m[0]);
 				continue;
 			}
+
+			if (!expecting_operator) {
+				// Unitary + and -
+				if (m = /[\-+]/.exec(text[i])) {
+					emit_token(OPERATOR, m[0], 0);
+					continue;
+				}
+			}
+
+			// operators, in decreasing precedence
+			found = false;
+			for (j=0; j<operators.length; j++) {
+				if (m = operators[j].exec(here)) {
+					emit_token(OPERATOR, m[0], j);
+					found = true;
+					expecting_operator = false;
+					break;
+				}
+			}
+			if (found) {continue;}
+
+			expecting_operator = true;
 
 			// number
 			if (m = /^(?:([\-+]?)(Inf(?:inity)?)|(NaN))\b/i.exec(here)) {
@@ -427,46 +501,29 @@ function parse(text, mode) {
 				continue;
 			}
 
-			// operators, in decreasing precedence
-			for (j=0; j<operators.length; j++) {
-				if (m = operators[j].exec(here)) {
-					emit_token(OPERATOR, m[0], j);
-					found = true;
-					break;
-				}
-			}
-			if (found) {continue;}
-
 			switch (text[i]) {
-				case '"': parse_combined(true, false);	continue;
-				case '{': parse_braced();				continue;
-				case '$': parse_variable();				continue;
-				case '[': parse_commands();				continue;
-				case '(':
-					emit_token(PARENTHESIS, text[i]);
-					parse_subexpr();
-					continue;
+				case '"': sub_parse(QUOTED, parse_quoted);		continue;
+				case '{': sub_parse(BRACED, parse_braced);		continue;
+				case '$': sub_parse(VAR, parse_variable);		continue;
+				case '[': sub_parse(SCRIPT, parse_commands);	continue;
+				case '(': emit_token(PARENTHESIS, text[i]);		continue;
 				case ')':
-					emit_token(funcargs ? SYNTAX : PARENTHESIS, text[i]);
-					return tokens;
-				case undefined:
-					emit_token(END);
-					return tokens;
+					if (funcargs) {
+						emit_token(SYNTAX, text[i]);
+						return;
+					}
+					emit_token(PARENTHESIS, text[i]);
+					continue;
 			}
 			if (funcargs) {
 				if (text[i] === ',') {
 					emit_token(SYNTAX, text[i]);
-					return tokens;
+					return;
 				}
 			}
 			// mathfunc
 			if (m = /^(\w+)(\s*)?\(/.exec(here)) {
-				emit_token(OPERAND, m[1], MATHFUNC);
-				if (m[2]) {emit_token(SPACE, m[2]);}
-				emit_token(SYNTAX, '(');
-				do {
-					parse_subexpr(true);
-				} while (tokens[tokens.length-1][1] === ',');
+				parse_mathfunc(m[1], m[2]);
 				continue;
 			}
 			// boolean

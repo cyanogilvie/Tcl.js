@@ -56,6 +56,7 @@ require([
 			}
 		}
 	}
+
 	function run(script) {
 		var interp = new TclInterp(),
 			obj = tclobj.AsObj(script),
@@ -126,6 +127,11 @@ require([
 		});
 		console.log('TclEval returned');
 	}
+
+	function expr(str) {
+		console.log('parser.parse_epr:', parser.parse_expr(str));
+	}
+
 	query('#test1').on('click', function(){
 		run('set a [getstring; list 2]\nputs "($a)"');
 	});
@@ -164,5 +170,8 @@ require([
 	});
 	query('#test12').on('click', function(){
 		run('puts [dict exists {a {b B} c C} a b]; puts [dict exists {a {a B} c C} a x]');
+	});
+	query('#test13').on('click', function(){
+		expr('2+-min(3, 4)');
 	});
 });

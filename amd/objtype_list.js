@@ -58,9 +58,13 @@ listhandlers = {
 };
 
 function ListObj(value) {
+	var i;
 	this.handlers = listhandlers;
 	if (value instanceof Array) {
-		this.jsval = value;
+		this.jsval = [];
+		for (i=0; i<value.length; i++) {
+			this.jsval.push(tclobj.AsObj(value[i]));
+		}
 	} else if (value === undefined) {
 		this.jsval = [];
 	} else {

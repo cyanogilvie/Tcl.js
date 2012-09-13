@@ -73,17 +73,23 @@ return function(/* extensions... */){
 				this.vars[varname].type === ARRAY;
 	};
 
-	this.get_scalar = function(varname) {
-		var vinfo = this.resolve_var(varname);
+	this.get_scalar = function(varname, make_unshared) {
+		var vinfo = this.resolve_var(varname), obj;
 		if (vinfo.type === ARRAY) {
 			throw new TclError('can\'t read "'+varname+'": variable is array',
 				'TCL', 'READ', 'VARNAME');
 		}
-		return vinfo.value;
+		obj = vinfo.value;
+		if (make_unshared && obj.refcount > 1) {
+			obj = obj.DuplicateObj();
+			vinfo.value = obj;
+			obj.IncrRefCount();
+		}
+		return obj;
 	};
 
-	this.get_array = function(array, index) {
-		var vinfo = this.resolve_var(array);
+	this.get_array = function(array, index, make_unshared) {
+		var vinfo = this.resolve_var(array), obj;
 		if (vinfo.type !== ARRAY) {
 			throw new TclError('can\'t read "'+array+'('+index+')": variable isn\'t array',
 				'TCL', 'LOOKUP', 'VARNAME', array);
@@ -93,7 +99,13 @@ return function(/* extensions... */){
 				throw new TclError('can\'t read "'+array+'('+index+')": no such element in array',
 					'TCL', 'READ', 'VARNAME');
 			}
-			return vinfo.value[index];
+			obj = vinfo.value[index];
+			if (make_unshared && obj.refcount > 1) {
+				obj = obj.DuplicateObj();
+				vinfo.value[index] = obj;
+				obj.IncrRefCount();
+			}
+			return obj;
 		}
 		return vinfo.value;
 	};
@@ -145,14 +157,15 @@ return function(/* extensions... */){
 		return [array, index];
 	};
 
-	this.get_var = function(varname) {
-		var parts;
+	this.get_var = function(varname, make_unshared) {
+		var parts, obj;
 		varname = tclobj.AsVal(varname);
 		if (varname[varname.length-1] === ')') {
 			parts = this._parse_varname(varname);
-			return this.get_array(parts[0], parts[1]);
+			return this.get_array(parts[0], parts[1], make_unshared);
 		}
-		return this.get_scalar(varname);
+		obj = this.get_scalar(varname, make_unshared);
+		return obj;
 	};
 
 	this.set_var = function(varname, value) {

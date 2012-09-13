@@ -568,6 +568,8 @@ return function(/* extensions... */){
 				throw new Error('Unexpected operand type: '+operand[1]);
 		}
 	}
+	// Hack to work around symbol renaming when minified. TODO: fix properly
+	window['resolve_operand'] = resolve_operand;
 	function eval_operator(op, args) {
 		var name = op[3];
 		if (mathops[args.length][name] === undefined) {
@@ -598,7 +600,8 @@ return function(/* extensions... */){
 		if (stack.length) {
 			throw new Error('Expr stack not empty at end of eval:', stack);
 		}
-		return resolve_operand(res);
+		//return resolve_operand(res);
+		return res;
 	};
 
 	this.TclError = TclError;

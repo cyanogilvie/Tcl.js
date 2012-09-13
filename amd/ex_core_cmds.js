@@ -12,11 +12,17 @@ define([
 ){
 'use strict';
 
-var TclError = types.TclError,
-	TclResult = types.TclResult;
+var TclResult = types.TclResult;
 
 function install(interp) {
 	if (interp.register_extension('ex_core_cmds')) {return;}
+
+	/* Core commands still to implement:
+	 subst time eval proc throw break variable error catch clock info array if
+	 coroutine global switch update for append format package namespace binary
+	 scan apply trace zlib while after vwait continue uplevel try foreach
+	 rename regexp upvar tailcall expr unset regsub interp incr string yield
+	 */
 
 	interp.registerCommand('set', function(args, interp){
 		interp.checkArgs(args, [1, 2], 'varName ?newValue?');

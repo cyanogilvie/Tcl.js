@@ -116,11 +116,7 @@ function install(interp) {
 	interp.registerCommand('lappend', function(args){
 		interp.checkArgs(args, [1, null], 'varname ?value ...?');
 		if (args.length === 2) {return interp.get_scalar(args[1]);}
-		var listobj = interp.get_scalar(args[1]), list, i;
-		if (listobj.IsShared()) {
-			listobj = listobj.DuplicateObj();
-			interp.set_scalar(args[1], listobj);
-		}
+		var listobj = interp.get_scalar(args[1], true), list, i;
 		list = listobj.GetList();
 		listobj.bytes = null;
 		for (i=2; i<args.length; i++) {

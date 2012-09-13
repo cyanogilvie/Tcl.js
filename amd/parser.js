@@ -419,7 +419,7 @@ function parse(text, mode) {
 			tokens = s_tokens;
 			e_i = i;
 			i = s_i;
-			emit_token(EXPR, text.substr(i, e_i-i), ARG, subtokens);
+			emit_token(ARG, text.substr(i, e_i-i), EXPR, subtokens);
 			return subtokens[subtokens.length-1][3];
 		}
 
@@ -615,13 +615,16 @@ function expr2stack(expr) {
 					stack.push(expr[i]);
 				}
 				break;
+			case SYNTAX:
+			case SPACE:
+				break;
 			default:
 				if (console !== undefined) {
 					console.warn('Ignoring expr item:', expr[i]);
 				}
 		}
 	}
-	if (stack[stack.length-1][0] === LPAREN) {
+	if (stack.length && stack[stack.length-1][0] === LPAREN) {
 		throw new Error('Unbalanced open parenthesis in expression');
 	}
 	while (stack.length) {

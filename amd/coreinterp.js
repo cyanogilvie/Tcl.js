@@ -32,10 +32,19 @@ var TclError = types.TclError,
 	BREAK = types.BREAK,
 	CONTINUE = types.CONTINUE,
 	OPERATOR = parser.OPERATOR,
-	OPERAND = parser.OPERAND;
+	OPERAND = parser.OPERAND,
+	MATHFUNC = parser.MATHFUNC,
+	INTEGER = parser.INTEGER,
+	FLOAT = parser.FLOAT,
+	BOOL = parser.BOOL,
+	QUOTED = parser.QUOTED,
+	BRACED = parser.BRACED,
+	EXPR = parser.EXPR,
+	ARG = parser.ARG;
 
 return function(/* extensions... */){
-	var args = Array.prototype.slice.call(arguments), i;
+	var args = Array.prototype.slice.call(arguments), i,
+		self = this, mathops, mathfuncs;
 
 	this.vars = {};
 	this.commands = {};
@@ -386,17 +395,185 @@ return function(/* extensions... */){
 		return promise;
 	};
 
-	function eval_operator(op, args) {
-		var textargs = [], i;
-		for (i=0; i<args.length; i++) {
-			textargs.push(args[i][3]);
+	function not_implemented(){throw new Error('Not implemented yet');}
+	function bignum_not_implemented(){throw new Error('Bignum support not implemented yet');}
+	mathfuncs = {
+		abs: 'abs',
+		acos: 'acos',
+		asin: 'asin',
+		atan: 'atan',
+		atan2: 'atan2',
+		bool: {args: [1, 1],
+			handler: function(args) {return [OPERAND, BOOL, list.bool(args[0])];}
+		},
+		ceil: 'ceil',
+		cos: 'cos',
+		cosh: {args: [1, 1], handler: not_implemented},
+		'double': {args: [1, 1],
+			handler: function(args) {return [OPERAND, FLOAT, args[0]];}
+		},
+		entier: {args: [1, 1], handler: bignum_not_implemented},
+		exp: 'exp',
+		floor: 'floor',
+		fmod: {args: [2, 2],
+			handler: function(args){ var a = args[0], b = args[1];
+				return a - (Math.floor(a / b) * b);
+			}
+		},
+		hypot: {args: [2, 2],
+			handler: function(args){ var a = args[0], b = args[1];
+				// I don't think this exactly does what the Tcl hypot does
+				return Math.sqrt(a*a + b*b);
+			}
+		},
+		'int': {args: [1, 1],
+			handler: function(args) {
+				return [OPERATOR, INTEGER, Math.floor(args[0])];
+			}
+		},
+		isqrt: {args: [1, 1], handler: bignum_not_implemented},
+		log: 'log',
+		log10: {args: [1, 1], handler: not_implemented},
+		max: 'max',
+		min: 'min',
+		pow: 'pow',
+		rand: 'random',	// Doesn't precisely match the bounds of the Tcl rand
+		round: {args: [1, 1],
+			handler: function(args) {
+				return [OPERATOR, INTEGER, Math.round(args[0])];
+			}
+		},
+		sin: 'sin',
+		sinh: {args: [1, 1], handler: not_implemented},
+		sqrt: 'sqrt',
+		srand: {args: [1, 1],	// TODO: implement an RNG that can be seeded?
+			handler: function() {}
+		},
+		tan: 'tan',
+		tanh: {args: [1, 1], handler: not_implemented},
+		wide: {args: [1, 1],
+			handler: function(args){
+				if (console) {
+					console.warn('Javascript doesn\'t support 64bit integers');
+				}
+				return [OPERATOR, INTEGER, Math.floor(args[0])];
+			}
 		}
-		return [
-			OPERAND,
-			-1,
-			[op, args],
-			op[3]+'('+textargs.join(',')+')'
+	};
+	mathops = {
+		1: {},
+		2: {
+			'in': function(a, b) {
+				var parts = tclobj.AsObj(b).GetList();
+				return parts.indexOf(a) !== -1;
+			},
+			'ni': function(a, b) {
+				var parts = tclobj.AsObj(b).GetList();
+				return parts.indexOf(a) === -1;
+			}
+		},
+		3: {
+			'?': function(a, b, c) {
+				return resolve_operand(a) ? resolve_operand(b) : resolve_operand(c);
+			}
+		},
+		any: {}
+	};
+	(function(){
+		var i, argcount, operators, j, tmp, op, imp;
+
+		function make_operator(argcount, op, imp) {
+			/*jslint evil: true */
+			if (argcount === 1) {
+				if (imp.length <= 3) {
+					mathops[argcount][op] = eval('(function(){return function(a){return '+imp+' resolve_operand(a);};}());');
+				} else {
+					mathops[argcount][op] = eval('(function(){return function(a) {return '+imp+'(resolve_operand(a));};}());');
+				}
+			} else if (argcount === 2) {
+				if (imp.length <= 3) {
+					mathops[argcount][op] = eval('(function(){return function(a,b){return resolve_operand(a) '+imp+' resolve_operand(b);};}());');
+				} else {
+					mathops[argcount][op] = eval('(function(){return function(a,b){return '+imp+'(resolve_operand(a), resolve_operand(b));};}());');
+				}
+			}
+			/*jslint evil: false */
+		}
+
+		tmp = [
+			1, ['+', '-', '~', '!'],
+			2, [['**', 'Math.pow'], '*', '/', '%', '+', '-', '<<', '>>',
+				'<', '>', '<=', '>=', '==', '!=',
+				['eq', '==='], ['ne', '!=='], '&', '^', '|', '&&', '||'
+			]
 		];
+		for (i=0; i<tmp.length; i+=2) {
+			argcount = tmp[i];
+			operators = tmp[i+1];
+			for (j=0; j<operators.length; j++) {
+				if (operators[j] instanceof Array) {
+					op = operators[j][0];
+					imp = operators[j][1];
+				} else {
+					op = imp = operators[j];
+				}
+				make_operator(argcount, op, imp);
+			}
+		}
+	}());
+
+	function resolve_operand(operand) {
+		var funcname, args, parts, j, resolved_arg, func_handler;
+		if (!(operand instanceof Array)) {return operand;}
+		switch (operand[1]) {
+			case MATHFUNC:
+				parts = operand[2];
+				funcname = parts[0][3];
+				args = [];
+				for (j=1; j<parts.length; j++) {
+					if (parts[j][0] === ARG) {
+						if (parts[j][1] === EXPR) {
+							resolved_arg = self.TclExpr(tclobj.NewExpr(parts[j][2]))[2];
+						} else {
+							resolved_arg = parts[j][2];
+						}
+						args.push(resolved_arg);
+					}
+				}
+				if (mathfuncs[funcname] === undefined) {
+					// Not really true yet
+					throw new TclError('invalid command name "tcl::mathfunc::'+funcname+'"');
+				}
+				func_handler = mathfuncs[funcname];
+				if (typeof func_handler === 'string') {
+					return Math[func_handler].apply(Math, args);
+				}
+				if (func_handler.args) {
+					if (args.length < func_handler.args[0]) {
+						throw new TclError('too few arguments to math function "'+funcname+'"', 'TCL', 'WRONGARGS');
+					}
+					if (func_handler.args[1] !== null && args.length > func_handler.args[1]) {
+						throw new TclError('too many arguments to math function "'+funcname+'"', 'TCL', 'WRONGARGS');
+					}
+				}
+				return func_handler.handler.call(func_handler.thisobj || self, args, self, func_handler.priv);
+			case INTEGER:
+			case FLOAT:
+			case BOOL:
+			case BRACED:
+				return operand[2];
+			case QUOTED:
+				throw new Error('Resolving a quoted string in an expression not suppoted yet');
+			default:
+				throw new Error('Unexpected operand type: '+operand[1]);
+		}
+	}
+	function eval_operator(op, args) {
+		var name = op[3];
+		if (mathops[args.length][name] === undefined) {
+			throw new TclError('Invalid operator "'+name+'"');
+		}
+		return mathops[args.length][name].apply(self, args);
 	}
 
 	this.TclExpr = function(expr) {

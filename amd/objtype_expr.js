@@ -42,7 +42,11 @@ var expr_handlers = {
 
 function ExprObj(value) {
 	this.handlers = expr_handlers;
-	this.jsval = jsval_from_string(String(value));
+	if (value instanceof Array) {
+		this.jsval = {parse: value};
+	} else {
+		this.jsval = jsval_from_string(String(value));
+	}
 }
 ExprObj.prototype = new types.TclObject();
 

@@ -598,7 +598,7 @@ return function(/* extensions... */){
 		if (stack.length) {
 			throw new Error('Expr stack not empty at end of eval:', stack);
 		}
-		return res;
+		return resolve_operand(res);
 	};
 
 	this.TclError = TclError;

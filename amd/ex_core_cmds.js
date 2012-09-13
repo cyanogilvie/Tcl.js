@@ -5,14 +5,12 @@ define([
 	'./ex_control_cmds',
 	'./ex_list_cmds',
 	'./ex_dict_cmds',
-	'./types',
-	'./list'
+	'./types'
 ], function(
 	ex_control_cmds,
 	ex_list_cmds,
 	ex_dict_cmds,
-	types,
-	tcllist
+	types
 ){
 'use strict';
 

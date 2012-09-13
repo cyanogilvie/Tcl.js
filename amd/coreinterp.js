@@ -408,6 +408,93 @@ return function(/* extensions... */){
 		return promise;
 	};
 
+	function resolve_operands(/* args */) {
+		var funcname, args, parts, func_handler, body, operands,
+			resolved_operands = [], cb, op_i,
+			_args = Array.prototype.slice.call(arguments);
+		if (_args.length < 3) {
+			throw new Error('Too few arguments to resolve_operands');
+		}
+		operands = _args.slice(0, _args.length-2);
+		body = _args[_args.length-2];
+		cb = _args[_args.length-1];
+		op_i = 0;
+
+		function next_operand() {
+			var operand = operands[op_i++];
+			if (operand === undefined) {
+				return cb(body.apply(null, resolved_operands));
+			}
+
+			function next_part(i){
+				if (i === parts.length) {
+					if (mathfuncs[funcname] === undefined) {
+						// Not really true yet
+						throw new TclError('invalid command name "tcl::mathfunc::'+funcname+'"');
+					}
+					func_handler = mathfuncs[funcname];
+					if (typeof func_handler === 'string') {
+						resolved_operands.push(Math[func_handler].apply(Math, args));
+					} else {
+						if (func_handler.args) {
+							if (args.length < func_handler.args[0]) {
+								throw new TclError('too few arguments to math function "'+funcname+'"', 'TCL', 'WRONGARGS');
+							}
+							if (func_handler.args[1] !== null && args.length > func_handler.args[1]) {
+								throw new TclError('too many arguments to math function "'+funcname+'"', 'TCL', 'WRONGARGS');
+							}
+						}
+						resolved_operands.push(func_handler.handler.call(func_handler.thisobj || self, args, self, func_handler.priv));
+					}
+					return next_operand();
+				}
+				if (parts[i][0] === ARG) {
+					if (parts[i][1] === EXPR) {
+						self.TclExpr(tclobj.NewExpr(parts[i][2])).then(
+							function(res) {
+								args.push(res);
+								next_part(i+1);
+							}, function(res) {
+								throw new Error('Error resolving expression: '+res);
+							}
+						);
+					} else {
+						args.push(parts[i][2]);
+						next_part(i+1);
+					}
+				} else {
+					next_part(i+1);
+				}
+			}
+			if (!(operand instanceof Array)) {
+				resolved_operands.push(operand);
+				return next_operand();
+			}
+			switch (operand[1]) {
+				case MATHFUNC:
+					parts = operand[2];
+					funcname = parts[0][3];
+					args = [];
+					return next_part(1);
+				case INTEGER:
+				case FLOAT:
+				case BOOL:
+				case BRACED:
+					resolved_operands.push(operand[2]);
+					break;
+				case QUOTED:
+					throw new Error('Resolving a quoted string in an expression not suppoted yet');
+				default:
+					throw new Error('Unexpected operand type: '+operand[1]);
+			}
+			next_operand();
+		}
+
+		next_operand();
+	}
+	// Hack to work around symbol renaming when minified. TODO: fix properly
+	window['resolve_operands'] = resolve_operands;
+
 	function not_implemented(){throw new Error('Not implemented yet');}
 	function bignum_not_implemented(){throw new Error('Bignum support not implemented yet');}
 	mathfuncs = {
@@ -474,20 +561,42 @@ return function(/* extensions... */){
 		}
 	};
 	mathops = {
-		1: {},
+		1: {
+			'!': function(a, c_ok) {
+				resolve_operands(a, function(a){
+					return ! list.bool(a);
+				}, c_ok);
+			}
+		},
 		2: {
-			'in': function(a, b) {
-				var parts = tclobj.AsObj(b).GetList();
-				return parts.indexOf(a) !== -1;
+			'||': function(a, b, cb) {
+				resolve_operands(a, function(a){
+					return list.bool(a) || b;
+				}, cb);
 			},
-			'ni': function(a, b) {
-				var parts = tclobj.AsObj(b).GetList();
-				return parts.indexOf(a) === -1;
+			'&&': function(a, b, cb) {
+				resolve_operands(a, function(a){
+					return list.bool(a) && b;
+				}, cb);
+			},
+			'in': function(a, b, cb) {
+				resolve_operands(a, b, function(a, b){
+					var parts = tclobj.AsObj(b).GetList();
+					return parts.indexOf(a) !== -1;
+				}, cb);
+			},
+			'ni': function(a, b, cb) {
+				resolve_operands(a, b, function(a, b){
+					var parts = tclobj.AsObj(b).GetList();
+					return parts.indexOf(a) === -1;
+				}, cb);
 			}
 		},
 		3: {
-			'?': function(a, b, c) {
-				return resolve_operand(a) ? resolve_operand(b) : resolve_operand(c);
+			'?': function(a, b, c, cb) {
+				return resolve_operands(a, function(a){
+					return list.bool(a) ? b : c;
+				}, cb);
 			}
 		},
 		any: {}
@@ -499,25 +608,25 @@ return function(/* extensions... */){
 			/*jslint evil: true */
 			if (argcount === 1) {
 				if (imp.length <= 3) {
-					mathops[argcount][op] = eval('(function(){return function(a){return '+imp+' resolve_operand(a);};}());');
+					mathops[argcount][op] = eval('(function(){return function(a, cb) {resolve_operands(a, function(a){return '+imp+' a;}, cb);};}());');
 				} else {
-					mathops[argcount][op] = eval('(function(){return function(a) {return '+imp+'(resolve_operand(a));};}());');
+					mathops[argcount][op] = eval('(function(){return function(a, cb) {resolve_operands(a, function(a){return '+imp+'(a);}, cb);};}());');
 				}
 			} else if (argcount === 2) {
 				if (imp.length <= 3) {
-					mathops[argcount][op] = eval('(function(){return function(a,b){return resolve_operand(a) '+imp+' resolve_operand(b);};}());');
+					mathops[argcount][op] = eval('(function(){return function(a, b, cb) {resolve_operands(a, b, function(a, b){return a '+imp+' b;}, cb);};}());');
 				} else {
-					mathops[argcount][op] = eval('(function(){return function(a,b){return '+imp+'(resolve_operand(a), resolve_operand(b));};}());');
+					mathops[argcount][op] = eval('(function(){return function(a, b, cb) {resolve_operands(a, b, function(a, b){return '+imp+'(a, b);}, cb);};}());');
 				}
 			}
 			/*jslint evil: false */
 		}
 
 		tmp = [
-			1, ['+', '-', '~', '!'],
+			1, ['+', '-', '~'],
 			2, [['**', 'Math.pow'], '*', '/', '%', '+', '-', '<<', '>>',
 				'<', '>', '<=', '>=', '==', '!=',
-				['eq', '==='], ['ne', '!=='], '&', '^', '|', '&&', '||'
+				['eq', '==='], ['ne', '!=='], '&', '^', '|'
 			]
 		];
 		for (i=0; i<tmp.length; i+=2) {
@@ -535,86 +644,54 @@ return function(/* extensions... */){
 		}
 	}());
 
-	function resolve_operand(operand) {
-		var funcname, args, parts, j, resolved_arg, func_handler;
-		if (!(operand instanceof Array)) {return operand;}
-		switch (operand[1]) {
-			case MATHFUNC:
-				parts = operand[2];
-				funcname = parts[0][3];
-				args = [];
-				for (j=1; j<parts.length; j++) {
-					if (parts[j][0] === ARG) {
-						if (parts[j][1] === EXPR) {
-							resolved_arg = self.TclExpr(tclobj.NewExpr(parts[j][2]))[2];
-						} else {
-							resolved_arg = parts[j][2];
-						}
-						args.push(resolved_arg);
-					}
-				}
-				if (mathfuncs[funcname] === undefined) {
-					// Not really true yet
-					throw new TclError('invalid command name "tcl::mathfunc::'+funcname+'"');
-				}
-				func_handler = mathfuncs[funcname];
-				if (typeof func_handler === 'string') {
-					return Math[func_handler].apply(Math, args);
-				}
-				if (func_handler.args) {
-					if (args.length < func_handler.args[0]) {
-						throw new TclError('too few arguments to math function "'+funcname+'"', 'TCL', 'WRONGARGS');
-					}
-					if (func_handler.args[1] !== null && args.length > func_handler.args[1]) {
-						throw new TclError('too many arguments to math function "'+funcname+'"', 'TCL', 'WRONGARGS');
-					}
-				}
-				return func_handler.handler.call(func_handler.thisobj || self, args, self, func_handler.priv);
-			case INTEGER:
-			case FLOAT:
-			case BOOL:
-			case BRACED:
-				return operand[2];
-			case QUOTED:
-				throw new Error('Resolving a quoted string in an expression not suppoted yet');
-			default:
-				throw new Error('Unexpected operand type: '+operand[1]);
-		}
-	}
-	// Hack to work around symbol renaming when minified. TODO: fix properly
-	window['resolve_operand'] = resolve_operand;
-	function eval_operator(op, args) {
-		var name = op[3];
-		if (mathops[args.length][name] === undefined) {
+	function eval_operator(op, args, cb) {
+		var name = op[3], takes = args.length;
+		if (mathops[takes][name] === undefined) {
 			throw new TclError('Invalid operator "'+name+'"');
 		}
-		return mathops[args.length][name].apply(self, args);
+		args.push(cb);
+		mathops[takes][name].apply(self, args);
 	}
 
 	this.TclExpr = function(expr) {
-		var P = tclobj.AsObj(expr).GetExprStack(), i, args, j, res, stack = [];
+		var P = tclobj.AsObj(expr).GetExprStack(), i=0, args, j, res,
+			stack = [], promise = new Promise();
 		// Algorithm from Harry Hutchins http://faculty.cs.niu.edu/~hutchins/csci241/eval.htm
-		for (i=0; i<P.length; i++) {
-			switch (P[i][0]) {
+		function next_P(){
+			var thisP = P[i++];
+			if (thisP === undefined) {
+				res = stack.pop();
+				if (stack.length) {
+					throw new Error('Expr stack not empty at end of eval:', stack);
+				}
+				resolve_operands(res, function(res){
+					return res;
+				}, function(res){
+					return promise.resolve(res);
+				});
+				return;
+			}
+
+			switch (thisP[0]) {
 				case OPERAND:
-					stack.push(P[i]);
+					stack.push(thisP);
 					break;
 				case OPERATOR:
 					args = [];
-					j = P[i][2];
+					j = thisP[2];
 					while (j--) {
 						args.push(stack.pop());
 					}
-					stack.push(eval_operator(P[i], args));
-					break;
+					eval_operator(thisP, args, function(res){
+						stack.push(res);
+						next_P();
+					});
+					return;
 			}
+			next_P();
 		}
-		res = stack.pop();
-		if (stack.length) {
-			throw new Error('Expr stack not empty at end of eval:', stack);
-		}
-		//return resolve_operand(res);
-		return res;
+		next_P();
+		return promise;
 	};
 
 	this.TclError = TclError;

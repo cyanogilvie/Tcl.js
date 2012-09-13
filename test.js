@@ -129,12 +129,15 @@ require([
 	}
 
 	function expr(str) {
-		var parsed = parser.parse_expr(str),
-			interp = new TclInterp();
+		var obj = tclobj.AsObj(str), interp = new TclInterp();
 		console.log('evaluating expression: {'+str+'}');
-		console.log('parser.parse_expr:', parsed);
-		console.log('stack:', parser.expr2stack(parsed));
-		console.log('result:', interp.TclExpr(str));
+		console.log('parser.parse_expr:', obj.GetExprParse());
+		console.log('stack:', obj.GetExprStack());
+		interp.TclExpr(obj).then(function(res){
+			console.log('result:', res);
+		}, function(res){
+			console.log('error:', res);
+		});
 	}
 
 	query('#test1').on('click', function(){

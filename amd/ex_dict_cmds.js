@@ -32,13 +32,12 @@ objkeys = Object.prototype.keys ? function(o){return o.keys();} : function(o){
 };
 
 function resolve_keypath(interp, dictobj, keys, create, dictvar) {
-	var key, lastdict = dictobj, root;
+	var key, lastdict, lastdictobj, root;
 	if (create === undefined) {create = false;}
 	if (dictvar !== undefined && dictobj.IsShared()) {
-		dictobj = dictobj.DuplicateObj();
-		interp.set_scalar(dictvar, dictobj);
+		dictobj = interp.get_var(dictvar, true);
 	}
-	root = dictobj;
+	lastdict = root = dictobj;
 	while (keys.length > 0) {
 		if (dictvar !== undefined && dictobj.IsShared()) {
 			dictobj = dictobj.DuplicateObj();
@@ -48,8 +47,10 @@ function resolve_keypath(interp, dictobj, keys, create, dictvar) {
 		}
 		key = keys.shift();
 		lastdict = dictobj.GetDict();
+		lastdictobj = dictobj;
 		if (lastdict[key] === undefined) {
 			if (create === true) {
+				dictobj.bytes = null;
 				lastdict[key] = tclobj.NewDict();
 				lastdict[key].IncrRefCount();
 			} else if (keys.length > 0) {
@@ -63,6 +64,7 @@ function resolve_keypath(interp, dictobj, keys, create, dictvar) {
 		root: root,
 		key: key,
 		lastdict: lastdict,
+		lastdictobj: lastdictobj,
 		value: dictobj
 	};
 }
@@ -79,17 +81,13 @@ subcmds = {
 		this.checkArgs(args, [3, null], 'dictionaryVariable key ?string ...?');
 		args.shift();
 		var dictvar = args.shift(),
-			dictobj = this.get_scalar(dictvar),
+			dictobj = this.get_var(dictvar, true),
 			dictval,
 			key = args.shift(),
 			strings = args, newval;
 
-		if (dictval.IsShared()) {
-			dictobj = tclobj.DuplicateObj(dictobj);
-			this.set_scalar(dictvar, dictobj);
-		}
-
 		dictval = dictobj.GetDict();
+		dictobj.bytes = null;
 
 		if (dictval[key] !== undefined) {
 			newval = dictval[key].toString() + strings.join('');
@@ -149,8 +147,7 @@ subcmds = {
 			valuevar = loopvars[1];
 			for (e in dictvals) {
 				if (dictvals.hasOwnProperty(e)) {
-					pairs.push(e);
-					pairs.push(dictvals[e]);
+					pairs.push(e, dictvals[e]);
 				}
 			}
 
@@ -270,15 +267,12 @@ subcmds = {
 	incr: function(args){
 		this.checkArgs(args, [2, 3], 'dictionaryVariable key ?increment?');
 		var dictvar = args[1],
-			dictobj = this.get_scalar(dictvar),
+			dictobj = this.get_var(dictvar, true),
 			dictval,
 			key = args[2],
 			increment = Number(args[3]) || 1;
-		if (dictobj.IsShared()) {
-			dictobj = dictobj.DuplicateObj();
-			this.set_scalar(dictobj);
-		}
 		dictval = dictobj.GetDict();
+		dictobj.bytes = null;
 		dictval[key].GetInt();
 		dictval[key].jsval += increment;
 		return dictval[key];
@@ -310,15 +304,12 @@ subcmds = {
 		this.checkArgs(args, [2, null], 'dictionaryVariable key ?value ...?');
 		args.shift();
 		var dictvar = args.shift(),
-			dictobj = this.get_scalar(dictvar),
+			dictobj = this.get_var(dictvar, true),
 			dictval,
 			key = args.shift(),
 			values = args, newlist;
-		if (dictobj.IsShared()) {
-			dictobj = dictobj.DuplicateObj();
-			this.set_scalar(dictvar, dictobj);
-		}
 		dictval = dictobj.GetDict();
+		dictobj.bytes = null;
 		if (dictval[key] === undefined) {
 			dictval[key] = tclobj.NewList();
 		}
@@ -393,6 +384,7 @@ subcmds = {
 		if (keys.length === 0) {return dictobj;}
 		dictobj = dictobj.DuplicateObj();
 		dictval = dictobj.GetDict();
+		dictobj.bytes = null;
 		for (i=0; i<keys.length; i++) {
 			if (dictval.hasOwnProperty(keys[i])) {
 				dictval[keys[i]].DecrRefCount();
@@ -412,6 +404,7 @@ subcmds = {
 		}
 		dictobj = dictobj.DuplicateObj();
 		dictval = dictobj.GetDict();
+		dictobj.bytes = null;
 		for (i=0; i<pairs.length; i+=2) {
 			key = pairs[i];
 			val = pairs[i+1];
@@ -423,19 +416,20 @@ subcmds = {
 		this.checkArgs(args, [3, null], 'dictionaryVariable key ?key ...? value');
 		args.shift();
 		var dictvar = args.shift(),
-			dictobj = this.get_scalar(dictvar),
+			dictobj = this.get_var(dictvar),
 			keys = args.slice(0, args.length-1),
 			value = args[args.length-1],
 			kinfo;
 
 		kinfo = resolve_keypath(this, dictobj, keys, true, dictvar);
+		kinfo.root.bytes = null;
 
 		if (kinfo.lastdict[kinfo.key] !== undefined) {
 			kinfo.lastdict[kinfo.key].DecrRefCount();
 		}
 		kinfo.lastdict[kinfo.key] = tclobj.AsObj(value);
 		kinfo.lastdict[kinfo.key].IncrRefCount();
-		return dictobj;
+		return kinfo.root;
 	},
 	size: function(args){
 		this.checkArgs(1, 'dictionaryValue');
@@ -445,12 +439,13 @@ subcmds = {
 		this.checkArgs(args, [3, null], 'dictionaryVariable key ?key ...? value');
 		args.shift();
 		var dictvar = args.shift(),
-			dictobj = this.get_scalar(dictvar),
+			dictobj = this.get_var(dictvar, true),
 			keys = args,
 			kinfo;
 
 		kinfo = resolve_keypath(this, dictobj, keys, false, dictvar);
 		if (kinfo.lastdict[kinfo.key] !== undefined) {
+			kinfo.lastdictobj.bytes = null;
 			kinfo.lastdict[kinfo.key].DecrRefCount();
 			delete kinfo.lastdict[kinfo.key];
 		}
@@ -460,17 +455,13 @@ subcmds = {
 		this.checkArgs(args, [4, null], 'dictionaryVariable key varName ?key Varname ...? body');
 		args.shift();
 		var dictvar = args.shift(),
-			dictobj = this.get_scalar(dictvar),
+			dictobj = this.get_var(dictvar),
 			pairs = args.slice(0, args.length-1),
 			body = args[args.length-1],
 			dictval, vars, i, promise;
 		if (pairs.length % 2 !== 0) {
 			throw new TclError('wrong # args: should be "dict update varName key varName ?key varName ...? script"',
 				'TCL', 'WRONGARGS');
-		}
-		if (dictobj.IsShared()) {
-			dictobj = dictobj.DuplicateObj();
-			this.set_scalar(dictvar, dictobj);
 		}
 		dictval = dictobj.GetDict();
 		for (i=0; i<pairs.length; i+=2) {
@@ -481,7 +472,7 @@ subcmds = {
 		function apply_updates(){
 			var i, dictobj, dictval, varname, key;
 			try {
-				dictobj = interp.get_scalar(dictvar);
+				dictobj = interp.get_var(dictvar);
 			} catch(e){
 				if (e instanceof types.TclError && /^TCL LOOKUP (DICT)|(VARNAME) /.test(e.errorcode.join(' '))) {
 					return;
@@ -490,9 +481,10 @@ subcmds = {
 			}
 			if (dictobj.IsShared()) {
 				dictobj = dictobj.DuplicateObj();
-				interp.set_scalar(dictvar, dictobj);
+				interp.set_var(dictvar, dictobj);
 			}
 			dictval = dictobj.GetDict();
+			dictobj.bytes = null;
 			for (i=0; i<pairs.length; i+=2) {
 				key = vars[i];
 				varname = vars[i+1];
@@ -554,7 +546,7 @@ subcmds = {
 		this.checkArgs(args, [2, null], 'dictionaryVariable ?key ...? body');
 		args.shift();
 		var dictvar = args.shift(),
-			dictobj = this.get_scalar(dictvar),
+			dictobj = this.get_var(dictvar),
 			keys = args.slice(0, args.length-1),
 			body = args[args.length-1],
 			dictval, vars, i, promise, kinfo;
@@ -570,7 +562,7 @@ subcmds = {
 		function apply_updates(){
 			var i, dictobj, dictval, varname;
 			try {
-				dictobj = interp.get_scalar(dictvar);
+				dictobj = interp.get_var(dictvar);
 				kinfo = resolve_keypath(interp, dictobj, keys, false, dictvar);
 			} catch(e){
 				if (e instanceof types.TclError && /^TCL LOOKUP (DICT)|(VARNAME) /.test(e.errorcode.join(' '))) {
@@ -580,6 +572,7 @@ subcmds = {
 			}
 			dictobj = kinfo.value;
 			dictval = dictobj.GetDict();
+			dictobj.bytes = null;
 			for (i=0; i<vars.length; i++) {
 				varname = vars[i];
 				if (dictval[varname] !== undefined) {

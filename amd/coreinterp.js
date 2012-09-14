@@ -1,4 +1,4 @@
-/*jslint plusplus: true, white: true, nomen: true */
+/*jslint plusplus: true, white: true, nomen: true, bitwise: true */
 /*global define */
 
 define([
@@ -8,7 +8,6 @@ define([
 	'./types',
 	'cflib/promise',
 	'cflib/tailcall',
-
 	'./objtype_list',
 	'./objtype_script',
 	'./objtype_expr'
@@ -18,7 +17,10 @@ define([
 	list,
 	types,
 	Promise,
-	TailCall
+	TailCall,
+	ListObj,
+	ScriptObj,
+	ExprObj
 ){
 "use strict";
 
@@ -39,6 +41,7 @@ var TclError = types.TclError,
 	BOOL = parser.BOOL,
 	QUOTED = parser.QUOTED,
 	BRACED = parser.BRACED,
+	SCRIPT = parser.SCRIPT,
 	EXPR = parser.EXPR,
 	ARG = parser.ARG;
 
@@ -484,6 +487,17 @@ return function(/* extensions... */){
 					break;
 				case QUOTED:
 					throw new Error('Resolving a quoted string in an expression not suppoted yet');
+				case SCRIPT:
+					if (operand[2] instanceof Array) {
+						operand[2] = new ScriptObj(operand[2]);
+					}
+					self.TclEval(operand[2]).then(function(res){
+						resolved_operands.push(res.result);
+						next_operand();
+					}, function(err){
+						throw new Error('Error resolving script operand: '+err);
+					});
+					return;
 				default:
 					throw new Error('Unexpected operand type: '+operand[1]);
 			}
@@ -492,8 +506,6 @@ return function(/* extensions... */){
 
 		next_operand();
 	}
-	// Hack to work around symbol renaming when minified. TODO: fix properly
-	window['resolve_operands'] = resolve_operands;
 
 	function not_implemented(){throw new Error('Not implemented yet');}
 	function bignum_not_implemented(){throw new Error('Bignum support not implemented yet');}
@@ -560,37 +572,84 @@ return function(/* extensions... */){
 			}
 		}
 	};
+	/*jslint eqeq: true */
 	mathops = {
 		1: {
-			'!': function(a, c_ok) {
-				resolve_operands(a, function(a){
-					return ! list.bool(a);
-				}, c_ok);
-			}
+			'!': function(a, cb) {resolve_operands(a, function(a){return ! list.bool(a);}, cb);},
+			'~': function(a, cb) {resolve_operands(a, function(a){return ~ a;}, cb);},
+			'-': function(a, cb) {resolve_operands(a, function(a){return - a;}, cb);},
+			'+': function(a, cb) {cb(a);}
 		},
 		2: {
-			'||': function(a, b, cb) {
-				resolve_operands(a, function(a){
-					return list.bool(a) || b;
-				}, cb);
-			},
-			'&&': function(a, b, cb) {
-				resolve_operands(a, function(a){
-					return list.bool(a) && b;
-				}, cb);
-			},
-			'in': function(a, b, cb) {
-				resolve_operands(a, b, function(a, b){
-					var parts = tclobj.AsObj(b).GetList();
-					return parts.indexOf(a) !== -1;
-				}, cb);
-			},
-			'ni': function(a, b, cb) {
-				resolve_operands(a, b, function(a, b){
-					var parts = tclobj.AsObj(b).GetList();
-					return parts.indexOf(a) === -1;
-				}, cb);
-			}
+			'*': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+				return a * b;
+			}, cb);},
+			'/': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+				return a / b;
+			}, cb);},
+			'%': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+				return a % b;
+			}, cb);},
+			'+': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+				return a + b;
+			}, cb);},
+			'-': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+				return a - b;
+			}, cb);},
+			'<<': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+				return a << b;
+			}, cb);},
+			'>>': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+				return a >> b;
+			}, cb);},
+			'**': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+				return Math.pow(a, b);
+			}, cb);},
+			'||': function(a, b, cb) {resolve_operands(a, function(a){
+				return list.bool(a) || b;
+			}, cb);},
+			'&&': function(a, b, cb) {resolve_operands(a, function(a){
+				return list.bool(a) && b;
+			}, cb);},
+			'<': function(a, b, cb) {resolve_operands(a, function(a){
+				return a < b;
+			}, cb);},
+			'>': function(a, b, cb) {resolve_operands(a, function(a){
+				return a > b;
+			}, cb);},
+			'<=': function(a, b, cb) {resolve_operands(a, function(a){
+				return a <= b;
+			}, cb);},
+			'>=': function(a, b, cb) {resolve_operands(a, function(a){
+				return a >= b;
+			}, cb);},
+			'==': function(a, b, cb) {resolve_operands(a, function(a){
+				return a == b;
+			}, cb);},
+			'!=': function(a, b, cb) {resolve_operands(a, function(a){
+				return a != b;
+			}, cb);},
+			'eq': function(a, b, cb) {resolve_operands(a, function(a){
+				return String(a) === String(b);
+			}, cb);},
+			'ne': function(a, b, cb) {resolve_operands(a, function(a){
+				return String(a) !== String(b);
+			}, cb);},
+			'&': function(a, b, cb) {resolve_operands(a, function(a){
+				return a & b;
+			}, cb);},
+			'^': function(a, b, cb) {resolve_operands(a, function(a){
+				return a ^ b;
+			}, cb);},
+			'|': function(a, b, cb) {resolve_operands(a, function(a){
+				return a | b;
+			}, cb);},
+			'in': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+				return tclobj.AsObj(b).GetList().indexOf(a) !== -1;
+			}, cb);},
+			'ni': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+				return tclobj.AsObj(b).GetList().indexOf(a) === -1;
+			}, cb);}
 		},
 		3: {
 			'?': function(a, b, c, cb) {
@@ -601,48 +660,7 @@ return function(/* extensions... */){
 		},
 		any: {}
 	};
-	(function(){
-		var i, argcount, operators, j, tmp, op, imp;
-
-		function make_operator(argcount, op, imp) {
-			/*jslint evil: true */
-			if (argcount === 1) {
-				if (imp.length <= 3) {
-					mathops[argcount][op] = eval('(function(){return function(a, cb) {resolve_operands(a, function(a){return '+imp+' a;}, cb);};}());');
-				} else {
-					mathops[argcount][op] = eval('(function(){return function(a, cb) {resolve_operands(a, function(a){return '+imp+'(a);}, cb);};}());');
-				}
-			} else if (argcount === 2) {
-				if (imp.length <= 3) {
-					mathops[argcount][op] = eval('(function(){return function(a, b, cb) {resolve_operands(a, b, function(a, b){return a '+imp+' b;}, cb);};}());');
-				} else {
-					mathops[argcount][op] = eval('(function(){return function(a, b, cb) {resolve_operands(a, b, function(a, b){return '+imp+'(a, b);}, cb);};}());');
-				}
-			}
-			/*jslint evil: false */
-		}
-
-		tmp = [
-			1, ['+', '-', '~'],
-			2, [['**', 'Math.pow'], '*', '/', '%', '+', '-', '<<', '>>',
-				'<', '>', '<=', '>=', '==', '!=',
-				['eq', '==='], ['ne', '!=='], '&', '^', '|'
-			]
-		];
-		for (i=0; i<tmp.length; i+=2) {
-			argcount = tmp[i];
-			operators = tmp[i+1];
-			for (j=0; j<operators.length; j++) {
-				if (operators[j] instanceof Array) {
-					op = operators[j][0];
-					imp = operators[j][1];
-				} else {
-					op = imp = operators[j];
-				}
-				make_operator(argcount, op, imp);
-			}
-		}
-	}());
+	/*jslint eqeq: false */
 
 	function eval_operator(op, args, cb) {
 		var name = op[3], takes = args.length;
@@ -663,6 +681,9 @@ return function(/* extensions... */){
 				res = stack.pop();
 				if (stack.length) {
 					throw new Error('Expr stack not empty at end of eval:', stack);
+				}
+				if (!(res instanceof Array)) {
+					return promise.resolve(res);
 				}
 				resolve_operands(res, function(res){
 					return res;

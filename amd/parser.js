@@ -402,13 +402,13 @@ function parse(text, mode) {
 			parse_combined(true, false);
 		}
 
-		function sub_parse(subtoken, func) {
-			var s_tokens = tokens.slice(), s_i = i, subtokens;
+		function sub_parse(subtoken, func, make_crep) {
+			var s_tokens = tokens.slice(), s_i = i, crep;
 			tokens = [];
 			func();
-			subtokens = tokens;
+			crep = make_crep ? make_crep(tokens) : tokens;
 			tokens = s_tokens;
-			emit_token(OPERAND, here.substr(0, i-s_i), subtoken, subtokens);
+			emit_token(OPERAND, here.substr(0, i-s_i), subtoken, crep);
 		}
 
 		function sub_parse_arg() {
@@ -507,7 +507,17 @@ function parse(text, mode) {
 				case '"': sub_parse(QUOTED, parse_quoted);		continue;
 				case '{': sub_parse(BRACED, parse_braced);		continue;
 				case '$': sub_parse(VAR, parse_variable);		continue;
-				case '[': sub_parse(SCRIPT, parse_commands);	continue;
+				case '[':
+					sub_parse(SCRIPT, parse_commands, function(tokens){
+						var i;
+						for (i=0; i<tokens.length; i++) {
+							if (tokens[i][0] === SCRIPT) {
+								return tokens[i];
+							}
+						}
+						throw new Error('No script found');
+					});
+					continue;
 				case '(': emit_token(LPAREN, text[i]);			continue;
 				case ')':
 					if (funcargs) {

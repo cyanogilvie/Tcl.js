@@ -82,9 +82,9 @@ function strip_for_exec(commands) {
 }
 
 function jsval_from_string(str) {
-	var jsval = {}, commands = parser.parse_script(str);
-	jsval.commands = commands;
-	return jsval;
+	return {
+		commands: parser.parse_script(str)
+	};
 }
 
 var script_handlers = {
@@ -107,7 +107,11 @@ var script_handlers = {
 
 function ScriptObj(value) {
 	this.handlers = script_handlers;
-	this.jsval = jsval_from_string(String(value));
+	if (value instanceof Array && value[0] === parser.SCRIPT) {
+		this.jsval = {commands: value};
+	} else {
+		this.jsval = jsval_from_string(String(value));
+	}
 }
 ScriptObj.prototype = new types.TclObject();
 

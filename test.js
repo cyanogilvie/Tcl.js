@@ -130,6 +130,9 @@ require([
 
 	function expr(str) {
 		var obj = tclobj.AsObj(str), interp = new TclInterp();
+		interp.registerCommand('get_num', function(args){
+			return 43;
+		});
 		console.log('evaluating expression: {'+str+'}');
 		console.log('parser.parse_expr:', obj.GetExprParse());
 		console.log('stack:', obj.GetExprStack());
@@ -180,6 +183,6 @@ require([
 		run('puts [dict exists {a {b B} c C} a b]; puts [dict exists {a {a B} c C} a x]');
 	});
 	query('#test13').on('click', function(){
-		expr('2+-min(3, 4)');
+		expr('2+-min(3, 4)+[get_num]');
 	});
 });

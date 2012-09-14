@@ -57,11 +57,14 @@ TclObjectBase = {
 	IsShared: function(){
 		return this.refCount > 1;
 	},
-	GetJsVal: function(){
+	valueOf: function(){
 		if (this.jsval === null) {
 			this.handlers.updateJsVal(this);
 		}
 		return this.jsval;
+	},
+	GetJsVal: function(){
+		return this.valueOf();
 	},
 	ConvertToType: function(type){
 		if (this.handlers.type === type) {return;}

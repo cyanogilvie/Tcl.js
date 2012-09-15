@@ -7,7 +7,6 @@ define([
 	'./list',
 	'./types',
 	'cflib/promise',
-	'cflib/tailcall',
 	'./objtype_list',
 	'./objtype_script',
 	'./objtype_expr'
@@ -17,7 +16,6 @@ define([
 	list,
 	types,
 	Promise,
-	TailCall,
 	ListObj,
 	ScriptObj,
 	ExprObj
@@ -43,6 +41,8 @@ var TclError = types.TclError,
 	BRACED = parser.BRACED,
 	SCRIPT = parser.SCRIPT,
 	EXPR = parser.EXPR,
+	VAR = parser.VAR,
+	INDEX = parser.INDEX,
 	ARG = parser.ARG;
 
 return function(/* extensions... */){
@@ -220,10 +220,10 @@ return function(/* extensions... */){
 	};
 
 	this.resolve_word = function(tokens, c_ok, c_err) {
-		var parts=[], expand=false, array, self=this;
+		var parts=[], expand=false, array, self=this, t_i=0;
 
-		function callnext(token){
-			var i, word, res, index;
+		return function next_token(){
+			var i, word, res, index, token = tokens[t_i++];
 
 			if (token === undefined) {
 				if (parts.length === 0) {
@@ -259,67 +259,65 @@ return function(/* extensions... */){
 					break;
 
 				case parser.INDEX:
-					return new TailCall(self.resolve_word, [token[1].slice(), function(indexwords){
+					return self.resolve_word(token[1], function(indexwords){
 						index = indexwords.join('');
 						parts.push(self.get_array(array, index));
 						array = null;
-						return new TailCall(callnext, [tokens.shift()]);
+						return next_token;
 					}, function(err){
 						return c_err(err);
-					}], self);
+					});
 
 				case parser.SCRIPT:
-					return new TailCall(self.exec, [token[1].slice(), function(result){
+					if (!(token[1] instanceof ScriptObj)) {
+						token[1] = new ScriptObj(token);
+					}
+					return self.exec(token[1], function(result){
 						parts.push(result.result);
-						return new TailCall(callnext, [tokens.shift()]);
+						return next_token;
 					}, function(err){
 						return c_err(err);
-					}], self);
+					});
 			}
 
-			return new TailCall(callnext, [tokens.shift()]);
-		}
-
-		return callnext(tokens.shift());
+			return next_token;
+		};
 	};
 
-	this.get_words = function(remaining, c_ok, c_err) {
-		var self = this, sofar = [];
+	this.get_words = function(commandline, c_ok, c_err) {
+		var self = this, sofar = [], r_i = 0;
 
-		function get_next(next){
-			var resolved;
+		return function next_word(){
+			var resolved, next = commandline[r_i++];
 
 			if (next === undefined) {
-				if (sofar.length > 0) {
-					try {
-						resolved = self.resolve_command(sofar[0]);
-					} catch(e){
-						return c_err(e);
-					}
-					sofar[0] = {
-						text: sofar[0],
-						cinfo: resolved
-					};
+				if (sofar.length === 0) {return c_ok(sofar);}
+				try {
+					resolved = self.resolve_command(sofar[0]);
+				} catch(e){
+					return c_err(e);
 				}
+				sofar[0] = {
+					text: sofar[0],
+					cinfo: resolved
+				};
 				return c_ok(sofar);
 			}
 
-			return new TailCall(self.resolve_word, [next.slice(), function(addwords){
+			return self.resolve_word(next, function(addwords){
 				var i;
 				for (i=0; i<addwords.length; i++) {
 					sofar.push(addwords[i]);
 				}
-				return get_next(remaining.shift());
+				return next_word;
 			}, function(err){
 				return c_err(err);
-			}], self);
-		}
-
-		return get_next(remaining.shift());
+			});
+		};
 	};
 
 	this.eval_command = function(commandline, c) {
-		var command, result, args, i, self=this;
+		var self=this;
 
 		function normalize_result(result) {
 			if (!(result instanceof TclResult)) {
@@ -331,9 +329,7 @@ return function(/* extensions... */){
 					result = new TclResult(OK, result);
 				}
 			}
-			if (!(result.result instanceof tclobj.TclObject)) {
-				result.result = tclobj.NewObj('auto', result.result);
-			}
+			result.result = tclobj.AsObj(result.result);
 			return result;
 		}
 
@@ -341,17 +337,18 @@ return function(/* extensions... */){
 			return c(normalize_result(result));
 		}
 
-		return this.get_words(commandline.slice(), function(words){
+		return this.get_words(commandline, function(words){
+			var i, result, args, command;
 			if (words.length === 0) {
 				return c(null);
 			}
-			command = words.shift();
+			command = words[0];
 			args = [command.text];
-			for (i=0; i<words.length; i++) {
+			for (i=1; i<words.length; i++) {
 				args.push(words[i]);
 			}
 			try {
-				result = command.cinfo.handler.call(command.thisobj, args, self, command.priv);
+				result = command.cinfo.handler(args, self, command.priv);
 			} catch(e) {
 				result = e;
 			}
@@ -369,10 +366,13 @@ return function(/* extensions... */){
 		});
 	};
 
-	this.exec = function(commands, c_ok, c_err) {
-		var lastresult=new TclResult(OK), self=this;
+	this.exec = function(script, c_ok, c_err) {
+		var lastresult=new TclResult(OK), self=this,
+			parse = tclobj.AsObj(script).GetExecParse(),
+			commands = parse[1], i = 0;
 
-		function eval_next(command){
+		return function next_command(){
+			var command = commands[i++];
 			if (command === undefined) {
 				if (lastresult.code === OK || lastresult.code === RETURN) {
 					return c_ok(lastresult);
@@ -380,30 +380,28 @@ return function(/* extensions... */){
 				return c_err(lastresult);
 			}
 
-			return new TailCall(self.eval_command, [command, function(result){
+			return self.eval_command(command, function(result){
 				if (result !== null) {
 					if (result.code === ERROR) {
 						return c_err(result);
 					}
 					lastresult = result;
 				}
-				return eval_next(commands.shift());
-			}], self);
-		}
-
-		return eval_next(commands.shift());
+				return next_command;
+			});
+		};
 	};
 
 	this._trampoline = function(res) {
-		while (res instanceof TailCall) {
-			res = res.invoke();
+		while (typeof res === "function") {
+			res = res();
 		}
+		return res;
 	};
 
 	this.TclEval = function(script) {
-		var promise = new Promise(), parse;
-		parse = tclobj.AsObj(script).GetExecParse();
-		this._trampoline(this.exec(parse[1].slice(), function(res){
+		var promise = new Promise();
+		this._trampoline(this.exec(script, function(res){
 			promise.resolve(res);
 		}, function(err){
 			promise.reject(err);
@@ -411,100 +409,120 @@ return function(/* extensions... */){
 		return promise;
 	};
 
-	function resolve_operands(/* args */) {
-		var funcname, args, parts, func_handler, body, operands,
-			resolved_operands = [], cb, op_i,
-			_args = Array.prototype.slice.call(arguments);
-		if (_args.length < 3) {
-			throw new Error('Too few arguments to resolve_operands');
-		}
-		operands = _args.slice(0, _args.length-2);
-		body = _args[_args.length-2];
-		cb = _args[_args.length-1];
-		op_i = 0;
+	function resolve_operand(operand, cb) {
+		var i = 2,	// 0 is funcname, 1 is (
+			parts, funcname, args;
 
-		function next_operand() {
-			var operand = operands[op_i++];
+		function next_part(){
+			var part = parts[i++], func_handler;
+			if (part === undefined) {
+				if (mathfuncs[funcname] === undefined) {
+					// Not really true yet
+					throw new TclError('invalid command name "tcl::mathfunc::'+funcname+'"');
+				}
+				func_handler = mathfuncs[funcname];
+				if (typeof func_handler === 'string') {
+					return cb(Math[func_handler].apply(Math, args));
+				}
+				if (func_handler.args) {
+					if (args.length < func_handler.args[0]) {
+						throw new TclError('too few arguments to math function "'+funcname+'"', 'TCL', 'WRONGARGS');
+					}
+					if (func_handler.args[1] !== null && args.length > func_handler.args[1]) {
+						throw new TclError('too many arguments to math function "'+funcname+'"', 'TCL', 'WRONGARGS');
+					}
+				}
+				return cb(func_handler.handler(args, self, func_handler.priv));
+			}
+			if (part[0] === ARG) {
+				if (part[1] === EXPR) {
+					return self._TclExpr(tclobj.NewExpr(part[2]),
+						function(res) {
+							args.push(res);
+							return next_part;
+						}, function(res) {
+							throw new Error('Error resolving expression: '+res);
+						}
+					);
+				} else {
+					args.push(part[2]);
+					return next_part;
+				}
+			} else {
+				return next_part;
+			}
+		}
+
+		if (!(operand instanceof Array)) {
+			return cb(operand);
+		}
+		//console.log('resolving operand: ', operand.slice());
+		switch (operand[1]) {
+			case MATHFUNC:
+				parts = operand[2];
+				funcname = parts[0][3];
+				args = [];
+				return next_part;
+			case INTEGER:
+			case FLOAT:
+			case BOOL:
+			case BRACED:
+				return cb(operand[2]);
+			case QUOTED:
+				throw new Error('Resolving a quoted string in an expression not suppoted yet');
+			case VAR:
+				if (operand[2].length === 1) {
+					return cb(self.get_scalar(operand[2][0]));
+				}
+				if (typeof operand[2][1] === 'string') {
+					return cb(self.get_array(operand[2][0], operand[2][1]));
+				}
+				return self.resolve_word(operand[2][1], function(indexwords){
+					var index;
+					index = indexwords.join('');
+					return cb(self.get_array(operand[2][0], index));
+				}, function(err){
+					throw new Error('Error resolving array index: '+err);
+				});
+			case SCRIPT:
+				if (operand[2] instanceof Array) {
+					operand[2] = new ScriptObj(operand[2]);
+				}
+				return self.exec(operand[2], function(res){
+					return cb(res.result);
+				}, function(err){
+					throw new Error('Error resolving script operand: '+err);
+				});
+			default:
+				throw new Error('Unexpected operand type: '+operand[1]);
+		}
+	}
+
+	function resolve_operands(operands, body, cb) {
+		var resolved_operands = [], i=0;
+
+		// Optimize the case when all the operands are already resolved
+		for (i=0; i<operands.length; i++) {
+			if (operands[i] instanceof Array) {
+				break;
+			}
+			resolved_operands.push(operands[i]);
+		}
+		if (i === operands.length) {
+			return cb(body.apply(null, resolved_operands));
+		}
+
+		return function next_operand() {
+			var operand = operands[i++];
 			if (operand === undefined) {
+				//console.log('operands: ', operands, ' resolve to: ', resolved_operands);
 				return cb(body.apply(null, resolved_operands));
 			}
-
-			function next_part(i){
-				if (i === parts.length) {
-					if (mathfuncs[funcname] === undefined) {
-						// Not really true yet
-						throw new TclError('invalid command name "tcl::mathfunc::'+funcname+'"');
-					}
-					func_handler = mathfuncs[funcname];
-					if (typeof func_handler === 'string') {
-						resolved_operands.push(Math[func_handler].apply(Math, args));
-					} else {
-						if (func_handler.args) {
-							if (args.length < func_handler.args[0]) {
-								throw new TclError('too few arguments to math function "'+funcname+'"', 'TCL', 'WRONGARGS');
-							}
-							if (func_handler.args[1] !== null && args.length > func_handler.args[1]) {
-								throw new TclError('too many arguments to math function "'+funcname+'"', 'TCL', 'WRONGARGS');
-							}
-						}
-						resolved_operands.push(func_handler.handler.call(func_handler.thisobj || self, args, self, func_handler.priv));
-					}
-					return next_operand();
-				}
-				if (parts[i][0] === ARG) {
-					if (parts[i][1] === EXPR) {
-						self.TclExpr(tclobj.NewExpr(parts[i][2])).then(
-							function(res) {
-								args.push(res);
-								next_part(i+1);
-							}, function(res) {
-								throw new Error('Error resolving expression: '+res);
-							}
-						);
-					} else {
-						args.push(parts[i][2]);
-						next_part(i+1);
-					}
-				} else {
-					next_part(i+1);
-				}
-			}
-			if (!(operand instanceof Array)) {
-				resolved_operands.push(operand);
-				return next_operand();
-			}
-			switch (operand[1]) {
-				case MATHFUNC:
-					parts = operand[2];
-					funcname = parts[0][3];
-					args = [];
-					return next_part(1);
-				case INTEGER:
-				case FLOAT:
-				case BOOL:
-				case BRACED:
-					resolved_operands.push(operand[2]);
-					break;
-				case QUOTED:
-					throw new Error('Resolving a quoted string in an expression not suppoted yet');
-				case SCRIPT:
-					if (operand[2] instanceof Array) {
-						operand[2] = new ScriptObj(operand[2]);
-					}
-					self.TclEval(operand[2]).then(function(res){
-						resolved_operands.push(res.result);
-						next_operand();
-					}, function(err){
-						throw new Error('Error resolving script operand: '+err);
-					});
-					return;
-				default:
-					throw new Error('Unexpected operand type: '+operand[1]);
-			}
-			next_operand();
-		}
-
-		next_operand();
+			return resolve_operand(operand, function(resolved){
+				resolved_operands.push(resolved);
+				return next_operand;
+			});
+		};
 	}
 
 	function not_implemented(){throw new Error('Not implemented yet');}
@@ -575,86 +593,86 @@ return function(/* extensions... */){
 	/*jslint eqeq: true */
 	mathops = {
 		1: {
-			'!': function(a, cb) {resolve_operands(a, function(a){return ! list.bool(a);}, cb);},
-			'~': function(a, cb) {resolve_operands(a, function(a){return ~ a;}, cb);},
-			'-': function(a, cb) {resolve_operands(a, function(a){return - a;}, cb);},
-			'+': function(a, cb) {cb(a);}
+			'!': function(args, cb) {return resolve_operands(args, function(a){return ! list.bool(a);}, cb);},
+			'~': function(args, cb) {return resolve_operands(args, function(a){return ~ a;}, cb);},
+			'-': function(args, cb) {return resolve_operands(args, function(a){return - a;}, cb);},
+			'+': function(args, cb) {return cb(args[0]);}
 		},
 		2: {
-			'*': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+			'*': function(args, cb) {return resolve_operands(args, function(a, b){
 				return a * b;
 			}, cb);},
-			'/': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+			'/': function(args, cb) {return resolve_operands(args, function(a, b){
 				return a / b;
 			}, cb);},
-			'%': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+			'%': function(args, cb) {return resolve_operands(args, function(a, b){
 				return a % b;
 			}, cb);},
-			'+': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+			'+': function(args, cb) {return resolve_operands(args, function(a, b){
 				return a + b;
 			}, cb);},
-			'-': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+			'-': function(args, cb) {return resolve_operands(args, function(a, b){
 				return a - b;
 			}, cb);},
-			'<<': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+			'<<': function(args, cb) {return resolve_operands(args, function(a, b){
 				return a << b;
 			}, cb);},
-			'>>': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+			'>>': function(args, cb) {return resolve_operands(args, function(a, b){
 				return a >> b;
 			}, cb);},
-			'**': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+			'**': function(args, cb) {return resolve_operands(args, function(a, b){
 				return Math.pow(a, b);
 			}, cb);},
-			'||': function(a, b, cb) {resolve_operands(a, function(a){
-				return list.bool(a) || b;
+			'||': function(args, cb) {return resolve_operands([args[0]], function(a){
+				return list.bool(a) || args[1];
 			}, cb);},
-			'&&': function(a, b, cb) {resolve_operands(a, function(a){
-				return list.bool(a) && b;
+			'&&': function(args, cb) {return resolve_operands([args[0]], function(a){
+				return list.bool(a) && args[1];
 			}, cb);},
-			'<': function(a, b, cb) {resolve_operands(a, function(a){
+			'<': function(args, cb) {return resolve_operands(args, function(a, b){
 				return a < b;
 			}, cb);},
-			'>': function(a, b, cb) {resolve_operands(a, function(a){
+			'>': function(args, cb) {return resolve_operands(args, function(a, b){
 				return a > b;
 			}, cb);},
-			'<=': function(a, b, cb) {resolve_operands(a, function(a){
+			'<=': function(args, cb) {return resolve_operands(args, function(a, b){
 				return a <= b;
 			}, cb);},
-			'>=': function(a, b, cb) {resolve_operands(a, function(a){
+			'>=': function(args, cb) {return resolve_operands(args, function(a, b){
 				return a >= b;
 			}, cb);},
-			'==': function(a, b, cb) {resolve_operands(a, function(a){
+			'==': function(args, cb) {return resolve_operands(args, function(a, b){
 				return a == b;
 			}, cb);},
-			'!=': function(a, b, cb) {resolve_operands(a, function(a){
+			'!=': function(args, cb) {return resolve_operands(args, function(a, b){
 				return a != b;
 			}, cb);},
-			'eq': function(a, b, cb) {resolve_operands(a, function(a){
+			'eq': function(args, cb) {return resolve_operands(args, function(a, b){
 				return String(a) === String(b);
 			}, cb);},
-			'ne': function(a, b, cb) {resolve_operands(a, function(a){
+			'ne': function(args, cb) {return resolve_operands(args, function(a, b){
 				return String(a) !== String(b);
 			}, cb);},
-			'&': function(a, b, cb) {resolve_operands(a, function(a){
+			'&': function(args, cb) {return resolve_operands(args, function(a, b){
 				return a & b;
 			}, cb);},
-			'^': function(a, b, cb) {resolve_operands(a, function(a){
+			'^': function(args, cb) {return resolve_operands(args, function(a, b){
 				return a ^ b;
 			}, cb);},
-			'|': function(a, b, cb) {resolve_operands(a, function(a){
+			'|': function(args, cb) {return resolve_operands(args, function(a, b){
 				return a | b;
 			}, cb);},
-			'in': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+			'in': function(args, cb) {return resolve_operands(args, function(a, b){
 				return tclobj.AsObj(b).GetList().indexOf(a) !== -1;
 			}, cb);},
-			'ni': function(a, b, cb) {resolve_operands(a, b, function(a, b){
+			'ni': function(args, cb) {return resolve_operands(args, function(a, b){
 				return tclobj.AsObj(b).GetList().indexOf(a) === -1;
 			}, cb);}
 		},
 		3: {
-			'?': function(a, b, c, cb) {
-				return resolve_operands(a, function(a){
-					return list.bool(a) ? b : c;
+			'?': function(args, cb) {
+				return resolve_operands([args[0]], function(a){
+					return list.bool(a) ? args[1] : args[2];
 				}, cb);
 			}
 		},
@@ -667,30 +685,36 @@ return function(/* extensions... */){
 		if (mathops[takes][name] === undefined) {
 			throw new TclError('Invalid operator "'+name+'"');
 		}
-		args.push(cb);
-		mathops[takes][name].apply(self, args);
+		return mathops[takes][name](args, cb);
 	}
 
 	this.TclExpr = function(expr) {
+		var promise = new Promise();
+		this._trampoline(this._TclExpr(expr, function(res){
+			promise.resolve(res);
+		}, function(err){
+			promise.reject(err);
+		}));
+		return promise;
+	};
+
+	this._TclExpr = function(expr, c_ok, c_err) {
 		var P = tclobj.AsObj(expr).GetExprStack(), i=0, args, j, res,
-			stack = [], promise = new Promise();
+			stack = [];
 		// Algorithm from Harry Hutchins http://faculty.cs.niu.edu/~hutchins/csci241/eval.htm
-		function next_P(){
+		return function next_P(){
 			var thisP = P[i++];
 			if (thisP === undefined) {
 				res = stack.pop();
 				if (stack.length) {
-					throw new Error('Expr stack not empty at end of eval:', stack);
+					throw new Error('Expr stack not empty at end of eval:'+stack);
 				}
 				if (!(res instanceof Array)) {
-					return promise.resolve(res);
+					return c_ok(res);
 				}
-				resolve_operands(res, function(res){
-					return res;
-				}, function(res){
-					return promise.resolve(res);
+				return resolve_operand(res, function(res){
+					return c_ok(res);
 				});
-				return;
 			}
 
 			switch (thisP[0]) {
@@ -703,16 +727,14 @@ return function(/* extensions... */){
 					while (j--) {
 						args.push(stack.pop());
 					}
-					eval_operator(thisP, args, function(res){
+					return eval_operator(thisP, args.reverse(), function(res){
+						//console.log('eval_operator '+thisP[3]+' (', args, ') = ', res);
 						stack.push(res);
-						next_P();
+						return next_P;
 					});
-					return;
 			}
-			next_P();
-		}
-		next_P();
-		return promise;
+			return next_P;
+		};
 	};
 
 	this.TclError = TclError;

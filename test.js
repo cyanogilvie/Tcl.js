@@ -133,6 +133,10 @@ require([
 		interp.registerCommand('get_num', function(args){
 			return 43;
 		});
+		interp.set_var('a', 6);
+		interp.set_array('b', 'x', 40);
+		interp.set_array('b', 'y', 4);
+		interp.set_array('b', '43', 4);
 		console.log('evaluating expression: {'+str+'}');
 		console.log('parser.parse_expr:', obj.GetExprParse());
 		console.log('stack:', obj.GetExprStack());
@@ -183,6 +187,11 @@ require([
 		run('puts [dict exists {a {b B} c C} a b]; puts [dict exists {a {a B} c C} a x]');
 	});
 	query('#test13').on('click', function(){
-		expr('2+-min(3, 4)+[get_num]');
+		//run('set a+b c; puts "hello $a+b"');
+		expr('$a+-min(3, 4)+[get_num]-$b(y)');
+		//expr('10 - 5');
+		//expr('$a+-min(3, 4)+[get_num]-$b([get_num])');
+		//expr('6 + -3 + 43 - 4');
+		//expr('2+-min(3, 4)+[get_num]');
 	});
 });

@@ -62,6 +62,7 @@ function strip_for_exec(commands) {
 					break;
 
 				default:
+					//console.log('stripping token: ', token.slice());
 					break;
 			}
 		}
@@ -106,9 +107,17 @@ var script_handlers = {
 };
 
 function ScriptObj(value) {
+	var i;
 	this.handlers = script_handlers;
 	if (value instanceof Array && value[0] === parser.SCRIPT) {
-		this.jsval = {commands: value};
+		this.jsval = {commands: []};
+		for (i=0; i<value.length; i++) {
+			if (value[i] instanceof Array) {
+				this.jsval.commands.push(value[i].slice());
+			} else {
+				this.jsval.commands.push(value[i]);
+			}
+		}
 	} else {
 		this.jsval = jsval_from_string(String(value));
 	}

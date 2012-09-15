@@ -403,12 +403,14 @@ function parse(text, mode) {
 		}
 
 		function sub_parse(subtoken, func, make_crep) {
-			var s_tokens = tokens.slice(), s_i = i, crep;
+			var s_tokens = tokens.slice(), s_i = i, e_i, crep;
 			tokens = [];
 			func();
 			crep = make_crep ? make_crep(tokens) : tokens;
 			tokens = s_tokens;
-			emit_token(OPERAND, here.substr(0, i-s_i), subtoken, crep);
+			e_i = i;
+			i = s_i;
+			emit_token(OPERAND, text.substr(i, e_i-i), subtoken, crep);
 		}
 
 		function sub_parse_arg() {
@@ -506,7 +508,28 @@ function parse(text, mode) {
 			switch (text[i]) {
 				case '"': sub_parse(QUOTED, parse_quoted);		continue;
 				case '{': sub_parse(BRACED, parse_braced);		continue;
-				case '$': sub_parse(VAR, parse_variable);		continue;
+				case '$':
+					sub_parse(VAR, parse_variable, function(tokens){
+						var i, array, index;
+						for (i=0; i<tokens.length; i++) {
+							switch (tokens[i][0]) {
+								case VAR: return [tokens[i][1]];
+								case ARRAY: array = tokens[i][1]; break;
+								case INDEX:
+									index = tokens[i][1];
+									if (index.length === 1 && index[0][0] === TXT) {
+										// Optimize the common case where the
+										// index is a simple string
+										return [array, index[0][1]];
+									} else {
+										// Index needs runtime resolution
+										return [array, tokens[i][1]];
+									}
+							}
+						}
+						throw new Error('No script found');
+					});
+					continue;
 				case '[':
 					sub_parse(SCRIPT, parse_commands, function(tokens){
 						var i;

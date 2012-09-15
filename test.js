@@ -145,6 +145,7 @@ require([
 		}, function(res){
 			console.log('error:', res);
 		});
+		console.log('TclExpr returned');
 	}
 
 	query('#test1').on('click', function(){
@@ -188,9 +189,9 @@ require([
 	});
 	query('#test13').on('click', function(){
 		//run('set a+b c; puts "hello $a+b"');
-		expr('$a+-min(3, 4)+[get_num]-$b(y)');
+		//expr('$a+-min(3, 4)+[get_num]-$b(y)');
 		//expr('10 - 5');
-		//expr('$a+-min(3, 4)+[get_num]-$b([get_num])');
+		expr('$a+-min(3, 4)+[get_num]-$b([get_num]) eq "42 [get_num]"');
 		//expr('6 + -3 + 43 - 4');
 		//expr('2+-min(3, 4)+[get_num]');
 	});

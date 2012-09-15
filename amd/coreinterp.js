@@ -468,7 +468,14 @@ return function(/* extensions... */){
 			case BRACED:
 				return cb(operand[2]);
 			case QUOTED:
-				throw new Error('Resolving a quoted string in an expression not suppoted yet');
+				return self.resolve_word(operand[2], function(chunks){
+					if (chunks.length === 1) {
+						return cb(chunks[0])
+					}
+					return cb(chunks.join(''));
+				}, function(err){
+					throw new Error('Error resolving quoted word: '+err);
+				});
 			case VAR:
 				if (operand[2].length === 1) {
 					return cb(self.get_scalar(operand[2][0]));

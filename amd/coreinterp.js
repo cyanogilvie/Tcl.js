@@ -444,10 +444,9 @@ return function(/* extensions... */){
 							throw new Error('Error resolving expression: '+res);
 						}
 					);
-				} else {
-					args.push(part[2]);
-					return next_part;
 				}
+				args.push(part[2]);
+				return next_part;
 			} else {
 				return next_part;
 			}
@@ -590,36 +589,21 @@ return function(/* extensions... */){
 			}
 		}
 	};
-	/*jslint eqeq: true */
 	mathops = {
 		1: {
 			'!': function(args, cb) {return resolve_operands(args, function(a){return ! list.bool(a);}, cb);},
-			'~': function(args, cb) {return resolve_operands(args, function(a){return ~ a;}, cb);},
-			'-': function(args, cb) {return resolve_operands(args, function(a){return - a;}, cb);},
+			'~': '~',
+			'-': '-',
 			'+': function(args, cb) {return cb(args[0]);}
 		},
 		2: {
-			'*': function(args, cb) {return resolve_operands(args, function(a, b){
-				return a * b;
-			}, cb);},
-			'/': function(args, cb) {return resolve_operands(args, function(a, b){
-				return a / b;
-			}, cb);},
-			'%': function(args, cb) {return resolve_operands(args, function(a, b){
-				return a % b;
-			}, cb);},
-			'+': function(args, cb) {return resolve_operands(args, function(a, b){
-				return a + b;
-			}, cb);},
-			'-': function(args, cb) {return resolve_operands(args, function(a, b){
-				return a - b;
-			}, cb);},
-			'<<': function(args, cb) {return resolve_operands(args, function(a, b){
-				return a << b;
-			}, cb);},
-			'>>': function(args, cb) {return resolve_operands(args, function(a, b){
-				return a >> b;
-			}, cb);},
+			'*': '*',
+			'/': '/',
+			'%': '%',
+			'+': '+',
+			'-': '-',
+			'<<': '<<',
+			'>>': '>>',
 			'**': function(args, cb) {return resolve_operands(args, function(a, b){
 				return Math.pow(a, b);
 			}, cb);},
@@ -629,39 +613,21 @@ return function(/* extensions... */){
 			'&&': function(args, cb) {return resolve_operands([args[0]], function(a){
 				return list.bool(a) && args[1];
 			}, cb);},
-			'<': function(args, cb) {return resolve_operands(args, function(a, b){
-				return a < b;
-			}, cb);},
-			'>': function(args, cb) {return resolve_operands(args, function(a, b){
-				return a > b;
-			}, cb);},
-			'<=': function(args, cb) {return resolve_operands(args, function(a, b){
-				return a <= b;
-			}, cb);},
-			'>=': function(args, cb) {return resolve_operands(args, function(a, b){
-				return a >= b;
-			}, cb);},
-			'==': function(args, cb) {return resolve_operands(args, function(a, b){
-				return a == b;
-			}, cb);},
-			'!=': function(args, cb) {return resolve_operands(args, function(a, b){
-				return a != b;
-			}, cb);},
+			'<': '<',
+			'>': '>',
+			'<=': '<=',
+			'>=': '>=',
+			'==': '==',
+			'!=': '!=',
 			'eq': function(args, cb) {return resolve_operands(args, function(a, b){
 				return String(a) === String(b);
 			}, cb);},
 			'ne': function(args, cb) {return resolve_operands(args, function(a, b){
 				return String(a) !== String(b);
 			}, cb);},
-			'&': function(args, cb) {return resolve_operands(args, function(a, b){
-				return a & b;
-			}, cb);},
-			'^': function(args, cb) {return resolve_operands(args, function(a, b){
-				return a ^ b;
-			}, cb);},
-			'|': function(args, cb) {return resolve_operands(args, function(a, b){
-				return a | b;
-			}, cb);},
+			'&': '&',
+			'^': '^',
+			'|': '|',
 			'in': function(args, cb) {return resolve_operands(args, function(a, b){
 				return tclobj.AsObj(b).GetList().indexOf(a) !== -1;
 			}, cb);},
@@ -678,12 +644,28 @@ return function(/* extensions... */){
 		},
 		any: {}
 	};
-	/*jslint eqeq: false */
 
+	var mathop_cache = [null, {}, {}];
 	function eval_operator(op, args, cb) {
 		var name = op[3], takes = args.length;
 		if (mathops[takes][name] === undefined) {
 			throw new TclError('Invalid operator "'+name+'"');
+		}
+		if (typeof mathops[takes][name] === "string") {
+			if (mathop_cache[takes][name] === undefined) {
+				/*jslint evil: true */
+				if (takes === 1) {
+					mathop_cache[takes][name] = new Function('a',
+						'return '+mathops[takes][name]+' a;'
+					);
+				} else {
+					mathop_cache[takes][name] = new Function('a', 'b',
+						'return a '+mathops[takes][name]+' b;'
+					);
+				}
+				/*jslint evil: false */
+			}
+			return resolve_operands(args, mathop_cache[takes][name], cb);
 		}
 		return mathops[takes][name](args, cb);
 	}

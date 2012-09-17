@@ -1,8 +1,8 @@
 /*jslint plusplus: true, white: true, nomen: true, newcap: true */
 /*global define */
 
-define(['./types'], function(types){
-"use strict";
+define(function(){
+'use strict';
 
 var iface, objtypes = {}, TclObjectBase, jsvalhandlers, NewObj;
 
@@ -109,13 +109,11 @@ NewObj = function(type, value) {
 	return obj;
 };
 
-types.TclObject = TclObject;
-types.TclObjectBase = TclObjectBase;
-
 RegisterObjType('jsval', jsvalhandlers);
 
 iface = {
 	'TclObject': TclObject,
+	'TclObjectBase': TclObjectBase,
 	'RegisterObjType': RegisterObjType,
 	'NewObj': NewObj,
 	'NewString': function(value){return NewObj('jsval', String(value));},

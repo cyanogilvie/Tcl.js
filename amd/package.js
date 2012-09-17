@@ -16,8 +16,7 @@ var profile = (function(){
 		releaseName: '',
 		action: 'release',
 		packages: [
-			{name: 'tcl', location: '.'},
-			{name: 'cflib', location: 'cflib'}
+			{name: 'tcl', location: '.'}
 		],
 		layerOptimize: 'closure',
 		optimize: 'closure',

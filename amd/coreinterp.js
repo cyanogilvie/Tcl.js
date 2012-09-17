@@ -6,7 +6,6 @@ define([
 	'./tclobject',
 	'./list',
 	'./types',
-	'cflib/promise',
 	'./objtype_list',
 	'./objtype_script',
 	'./objtype_expr'
@@ -15,7 +14,6 @@ define([
 	tclobj,
 	list,
 	types,
-	Promise,
 	ListObj,
 	ScriptObj,
 	ExprObj
@@ -190,7 +188,7 @@ return function(/* extensions... */){
 		return cinfo;
 	};
 
-	this.registerCommand = function(commandname, handler, thisobj, priv, onDelete) {
+	this._registerCmd = function(async, commandname, handler, priv, onDelete) {
 		var cinfo = this.resolve_command(commandname, false);
 		if (cinfo !== undefined && cinfo.onDelete) {
 			cinfo.onDelete(cinfo.priv);
@@ -199,9 +197,15 @@ return function(/* extensions... */){
 			};
 		}
 		cinfo.handler = handler;
+		cinfo.async = async;
 		cinfo.priv = priv;
-		cinfo.thisobj = thisobj !== undefined ? thisobj : null;
 		cinfo.onDelete = onDelete;
+	};
+	this.registerCommand = function(commandname, handler, priv, onDelete) {
+		return this._registerCmd(false, commandname, handler, priv, onDelete);
+	};
+	this.registerAsyncCommand = function(commandname, handler, priv, onDelete) {
+		return this._registerCmd(true, commandname, handler, priv, onDelete);
 	};
 
 	this.checkArgs = function(args, count, msg) {
@@ -223,18 +227,14 @@ return function(/* extensions... */){
 		var parts=[], expand=false, array, self=this, t_i=0;
 
 		return function next_token(){
-			var i, word, res, index, token = tokens[t_i++];
+			var i, res, index, token = tokens[t_i++];
 
 			if (token === undefined) {
 				if (parts.length === 0) {
 					return c_ok([]);
 				}
 				if (parts.length > 1) {
-					word = '';
-					for (i=0; i<parts.length; i++) {
-						word += parts[i].GetString();
-					}
-					res = tclobj.NewString(word);
+					res = tclobj.NewString(parts.join(''));
 				} else {
 					res = parts[0];
 				}
@@ -273,10 +273,11 @@ return function(/* extensions... */){
 						token[1] = new ScriptObj(token);
 					}
 					return self.exec(token[1], function(result){
-						parts.push(result.result);
-						return next_token;
-					}, function(err){
-						return c_err(err);
+						if (result.code === OK) {
+							parts.push(result.result);
+							return next_token;
+						}
+						return c_err(result);
 					});
 			}
 
@@ -322,14 +323,13 @@ return function(/* extensions... */){
 		function normalize_result(result) {
 			if (!(result instanceof TclResult)) {
 				if (result instanceof TclError) {
-					result = new TclResult(ERROR, result, {errorcode: result.errorcode});
+					result = result.toTclResult();
 				} else if (result instanceof Error) {
 					result = new TclResult(ERROR, tclobj.NewString(result));
 				} else {
 					result = new TclResult(OK, result);
 				}
 			}
-			result.result = tclobj.AsObj(result.result);
 			return result;
 		}
 
@@ -348,25 +348,48 @@ return function(/* extensions... */){
 				args.push(words[i]);
 			}
 			try {
-				result = command.cinfo.handler(args, self, command.priv);
+				if (command.cinfo.async) {
+					result = command.cinfo.handler(function(result){
+						try {
+							while (typeof result === 'function') { // Support tailcalls
+								result = command.cinfo.handler(args, self, command.priv);
+							}
+							self._trampoline(got_result(result));
+						} catch(e2){
+							console.error(e2.stack);
+							debugger;
+							if (!(e2 instanceof TclError)) {
+								e2 = new TclError(e2);
+							}
+							return got_result(e2);
+						}
+					}, args, self, command.priv);
+					if (result !== undefined) {
+						if (console) {
+							console.warn('Async command handler "'+command.text+'" returned result: "', result, '"');
+						}
+					}
+					return;
+				}
+				do { // Support tailcalls
+					result = command.cinfo.handler(args, self, command.priv);
+				} while (typeof result === 'function');
 			} catch(e) {
 				result = e;
 			}
-			if (result instanceof Promise) {
-				result.then(function(result){
-					self._trampoline(got_result(result));
-				}, function(err){
-					self._trampoline(got_result(new TclResult(ERROR, tclobj.NewString(err))));
-				});
-			} else {
-				return got_result(result);
-			}
+			return got_result(result);
 		}, function(err){
+			if (!(err instanceof TclResult)) {
+				if (!(err instanceof TclError)) {
+					err = new TclError(err);
+				}
+				err = err.toTclResult();
+			}
 			return c(err);
 		});
 	};
 
-	this.exec = function(script, c_ok, c_err) {
+	this.exec = function(script, c) {
 		var lastresult=new TclResult(OK), self=this,
 			parse = tclobj.AsObj(script).GetExecParse(),
 			commands = parse[1], i = 0;
@@ -374,16 +397,13 @@ return function(/* extensions... */){
 		return function next_command(){
 			var command = commands[i++];
 			if (command === undefined) {
-				if (lastresult.code === OK || lastresult.code === RETURN) {
-					return c_ok(lastresult);
-				}
-				return c_err(lastresult);
+				return c(lastresult);
 			}
 
 			return self.eval_command(command, function(result){
 				if (result !== null) {
-					if (result.code === ERROR) {
-						return c_err(result);
+					if (result.code !== OK) {
+						return c(result);
 					}
 					lastresult = result;
 				}
@@ -396,20 +416,20 @@ return function(/* extensions... */){
 		while (typeof res === "function") {
 			res = res();
 		}
-		return res;
 	};
 
-	this.TclEval = function(script) {
-		var promise = new Promise();
-		this._trampoline(this.exec(script, function(res){
-			promise.resolve(res);
-		}, function(err){
-			promise.reject(err);
-		}));
-		return promise;
+	this.TclEval = function(script, c) {
+		try {
+			this._trampoline(this.exec(script, c));
+		} catch(e){
+			if (!(e instanceof TclError)) {
+				e = new TclError(e);
+			}
+			c(e.toTclResult());
+		}
 	};
 
-	function resolve_operand(operand, cb) {
+	function resolve_operand(operand, c) {
 		var i = 2,	// 0 is funcname, 1 is (
 			parts, funcname, args;
 
@@ -422,7 +442,7 @@ return function(/* extensions... */){
 				}
 				func_handler = mathfuncs[funcname];
 				if (typeof func_handler === 'string') {
-					return cb(Math[func_handler].apply(Math, args));
+					return c(Math[func_handler].apply(Math, args));
 				}
 				if (func_handler.args) {
 					if (args.length < func_handler.args[0]) {
@@ -432,7 +452,7 @@ return function(/* extensions... */){
 						throw new TclError('too many arguments to math function "'+funcname+'"', 'TCL', 'WRONGARGS');
 					}
 				}
-				return cb(func_handler.handler(args, self, func_handler.priv));
+				return c(func_handler.handler(args, self, func_handler.priv));
 			}
 			if (part[0] === ARG) {
 				if (part[1] === EXPR) {
@@ -446,14 +466,12 @@ return function(/* extensions... */){
 					);
 				}
 				args.push(part[2]);
-				return next_part;
-			} else {
-				return next_part;
 			}
+			return next_part;
 		}
 
 		if (!(operand instanceof Array)) {
-			return cb(operand);
+			return c(operand);
 		}
 		//console.log('resolving operand: ', operand.slice());
 		switch (operand[1]) {
@@ -465,28 +483,28 @@ return function(/* extensions... */){
 			case INTEGER:
 			case FLOAT:
 			case BOOL:
+				return c(operand[2]);
 			case BRACED:
-				return cb(operand[2]);
 			case QUOTED:
 				return self.resolve_word(operand[2], function(chunks){
 					if (chunks.length === 1) {
-						return cb(chunks[0])
+						return c(chunks[0]);
 					}
-					return cb(chunks.join(''));
+					return c(chunks.join(''));
 				}, function(err){
 					throw new Error('Error resolving quoted word: '+err);
 				});
 			case VAR:
 				if (operand[2].length === 1) {
-					return cb(self.get_scalar(operand[2][0]));
+					return c(self.get_scalar(operand[2][0]));
 				}
 				if (typeof operand[2][1] === 'string') {
-					return cb(self.get_array(operand[2][0], operand[2][1]));
+					return c(self.get_array(operand[2][0], operand[2][1]));
 				}
 				return self.resolve_word(operand[2][1], function(indexwords){
 					var index;
 					index = indexwords.join('');
-					return cb(self.get_array(operand[2][0], index));
+					return c(self.get_array(operand[2][0], index));
 				}, function(err){
 					throw new Error('Error resolving array index: '+err);
 				});
@@ -495,16 +513,14 @@ return function(/* extensions... */){
 					operand[2] = new ScriptObj(operand[2]);
 				}
 				return self.exec(operand[2], function(res){
-					return cb(res.result);
-				}, function(err){
-					throw new Error('Error resolving script operand: '+err);
+					return c(res.result);
 				});
 			default:
 				throw new Error('Unexpected operand type: '+operand[1]);
 		}
 	}
 
-	function resolve_operands(operands, body, cb) {
+	function resolve_operands(operands, body, c) {
 		var resolved_operands = [], i=0;
 
 		// Optimize the case when all the operands are already resolved
@@ -515,14 +531,14 @@ return function(/* extensions... */){
 			resolved_operands.push(operands[i]);
 		}
 		if (i === operands.length) {
-			return cb(body.apply(null, resolved_operands));
+			return c(body.apply(null, resolved_operands));
 		}
 
 		return function next_operand() {
 			var operand = operands[i++];
 			if (operand === undefined) {
 				//console.log('operands: ', operands, ' resolve to: ', resolved_operands);
-				return cb(body.apply(null, resolved_operands));
+				return c(body.apply(null, resolved_operands));
 			}
 			return resolve_operand(operand, function(resolved){
 				resolved_operands.push(resolved);
@@ -598,10 +614,10 @@ return function(/* extensions... */){
 	};
 	mathops = {
 		1: {
-			'!': function(args, cb) {return resolve_operands(args, function(a){return ! list.bool(a);}, cb);},
+			'!': function(args, c) {return resolve_operands(args, function(a){return ! list.bool(a);}, c);},
 			'~': '~',
 			'-': '-',
-			'+': function(args, cb) {return cb(args[0]);}
+			'+': function(args, c) {return c(args[0]);}
 		},
 		2: {
 			'*': '*',
@@ -611,49 +627,49 @@ return function(/* extensions... */){
 			'-': '-',
 			'<<': '<<',
 			'>>': '>>',
-			'**': function(args, cb) {return resolve_operands(args, function(a, b){
+			'**': function(args, c) {return resolve_operands(args, function(a, b){
 				return Math.pow(a, b);
-			}, cb);},
-			'||': function(args, cb) {return resolve_operands([args[0]], function(a){
+			}, c);},
+			'||': function(args, c) {return resolve_operands([args[0]], function(a){
 				return list.bool(a) || args[1];
-			}, cb);},
-			'&&': function(args, cb) {return resolve_operands([args[0]], function(a){
+			}, c);},
+			'&&': function(args, c) {return resolve_operands([args[0]], function(a){
 				return list.bool(a) && args[1];
-			}, cb);},
+			}, c);},
 			'<': '<',
 			'>': '>',
 			'<=': '<=',
 			'>=': '>=',
 			'==': '==',
 			'!=': '!=',
-			'eq': function(args, cb) {return resolve_operands(args, function(a, b){
+			'eq': function(args, c) {return resolve_operands(args, function(a, b){
 				return String(a) === String(b);
-			}, cb);},
-			'ne': function(args, cb) {return resolve_operands(args, function(a, b){
+			}, c);},
+			'ne': function(args, c) {return resolve_operands(args, function(a, b){
 				return String(a) !== String(b);
-			}, cb);},
+			}, c);},
 			'&': '&',
 			'^': '^',
 			'|': '|',
-			'in': function(args, cb) {return resolve_operands(args, function(a, b){
+			'in': function(args, c) {return resolve_operands(args, function(a, b){
 				return tclobj.AsObj(b).GetList().indexOf(a) !== -1;
-			}, cb);},
-			'ni': function(args, cb) {return resolve_operands(args, function(a, b){
+			}, c);},
+			'ni': function(args, c) {return resolve_operands(args, function(a, b){
 				return tclobj.AsObj(b).GetList().indexOf(a) === -1;
-			}, cb);}
+			}, c);}
 		},
 		3: {
-			'?': function(args, cb) {
+			'?': function(args, c) {
 				return resolve_operands([args[0]], function(a){
 					return list.bool(a) ? args[1] : args[2];
-				}, cb);
+				}, c);
 			}
 		},
 		any: {}
 	};
 
 	var mathop_cache = [null, {}, {}];
-	function eval_operator(op, args, cb) {
+	function eval_operator(op, args, c) {
 		var name = op[3], takes = args.length;
 		if (mathops[takes][name] === undefined) {
 			throw new TclError('Invalid operator "'+name+'"');
@@ -672,22 +688,23 @@ return function(/* extensions... */){
 				}
 				/*jslint evil: false */
 			}
-			return resolve_operands(args, mathop_cache[takes][name], cb);
+			return resolve_operands(args, mathop_cache[takes][name], c);
 		}
-		return mathops[takes][name](args, cb);
+		return mathops[takes][name](args, c);
 	}
 
-	this.TclExpr = function(expr) {
-		var promise = new Promise();
-		this._trampoline(this._TclExpr(expr, function(res){
-			promise.resolve(res);
-		}, function(err){
-			promise.reject(err);
-		}));
-		return promise;
+	this.TclExpr = function(expr, c) {
+		try {
+			this._trampoline(this._TclExpr(expr, c));
+		} catch(e){
+			if (!(e instanceof TclError)) {
+				e = new TclError(e);
+			}
+			c(e.toTclResult());
+		}
 	};
 
-	this._TclExpr = function(expr, c_ok, c_err) {
+	this._TclExpr = function(expr, c) {
 		var P = tclobj.AsObj(expr).GetExprStack(), i=0, args, j, res,
 			stack = [];
 		// Algorithm from Harry Hutchins http://faculty.cs.niu.edu/~hutchins/csci241/eval.htm
@@ -699,10 +716,10 @@ return function(/* extensions... */){
 					throw new Error('Expr stack not empty at end of eval:'+stack);
 				}
 				if (!(res instanceof Array)) {
-					return c_ok(res);
+					return c(new TclResult(OK, res));
 				}
 				return resolve_operand(res, function(res){
-					return c_ok(res);
+					return c(new TclResult(OK, res));
 				});
 			}
 

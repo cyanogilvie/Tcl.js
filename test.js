@@ -5,14 +5,14 @@ require([
 	'tcl/parser',
 	'tcl/interp',
 	'tcl/tclobject',
-	'cflib/promise',
+	'tcl/types',
 	'dojo/dom-construct',
 	'dojo/query'
 ], function(
 	parser,
 	TclInterp,
 	tclobj,
-	Promise,
+	types,
 	domConstruct,
 	query
 ) {
@@ -107,23 +107,23 @@ require([
 			}
 			return 'o';
 		});
-		interp.registerCommand('bar', function(args, interp){
-			var promise = new Promise();
+		interp.registerAsyncCommand('bar', function(c, args, interp){
 			if (args.length !== 1) {
 				throw new interp.TclError('wrong # args: should be "'+args[0]+'"',
 					'TCL', 'WRONGARGS');
 			}
 			setTimeout(function(){
-				promise.resolve('delayed result');
+				c('delayed result');
 			}, 2000);
-			return promise;
 		});
-		interp.TclEval(script).then(function(result){
-			console.log('Got ok: ', result, ' string concat: "'+result.result+'"');
-			domConstruct.create('span', {className: 'tclresult', innerHTML: result.result+'\n'}, outputnode);
-		}, function(err){
-			console.log('Got error: ', err, ': "'+err+'"');
-			domConstruct.create('span', {className: 'tclerror', innerHTML: err.result+'\n'}, outputnode);
+		interp.TclEval(script, function(result){
+			if (result.code === types.OK) {
+				console.log('Got ok: ', result, ' string concat: "'+result.result+'"');
+				domConstruct.create('span', {className: 'tclresult', innerHTML: result.result+'\n'}, outputnode);
+			} else {
+				console.log('Got error: ', result, ': "'+result.result+'"');
+				domConstruct.create('span', {className: 'tclerror', innerHTML: result.result+'\n'}, outputnode);
+			}
 		});
 		console.log('TclEval returned');
 	}
@@ -140,10 +140,8 @@ require([
 		console.log('evaluating expression: {'+str+'}');
 		console.log('parser.parse_expr:', obj.GetExprParse());
 		console.log('stack:', obj.GetExprStack());
-		interp.TclExpr(obj).then(function(res){
+		interp.TclExpr(obj, function(res){
 			console.log('result:', res);
-		}, function(res){
-			console.log('error:', res);
 		});
 		console.log('TclExpr returned');
 	}
@@ -191,7 +189,8 @@ require([
 		//run('set a+b c; puts "hello $a+b"');
 		//expr('$a+-min(3, 4)+[get_num]-$b(y)');
 		//expr('10 - 5');
-		expr('$a+-min(3, 4)+[get_num]-$b([get_num]) eq "42 [get_num]"');
+		//expr('$a+-min(3, 4)+[get_num]-$b([get_num]) eq "42 [get_num]"');
+		expr('$a+-min(3, 4)+[get_num]-$b([get_num]) eq {42}');
 		//expr('6 + -3 + 43 - 4');
 		//expr('2+-min(3, 4)+[get_num]');
 	});

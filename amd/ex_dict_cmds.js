@@ -4,38 +4,36 @@
 define([
 	'./list',
 	'./types',
+	'./utils',
 	'./tclobject',
-	'cflib/promise',
-	'cflib/tailcall',
-
 	'./objtype_dict',
 	'./objtype_list'
 ], function(
 	tcllist,
 	types,
+	utils,
 	tclobj,
-	Promise,
-	TailCall
+	DictObj,
+	ListObj
 ){
 'use strict';
 
-var objkeys, TclError = types.TclError, subcmds;
+var TclError = types.TclError, subcmds;
 
-objkeys = Object.prototype.keys ? function(o){return o.keys();} : function(o){
-	var e, res = [];
-	for (e in o) {
-		if (o.hasOwnProperty(e)) {
-			res.push(e);
-		}
+function make_unshared(dictval, key) {
+	if (dictval[key].IsShared()) {
+		var tmp = dictval[key].DuplicateObj();
+		dictval[key].DecrRefCount();
+		dictval[key] = tmp;
+		dictval[key].IncrRefCount();
 	}
-	return res;
-};
+}
 
-function resolve_keypath(interp, dictobj, keys, create, dictvar) {
+function resolve_keypath(I, dictobj, keys, create, dictvar) {
 	var key, lastdict, lastdictobj, root;
 	if (create === undefined) {create = false;}
 	if (dictvar !== undefined && dictobj.IsShared()) {
-		dictobj = interp.get_var(dictvar, true);
+		dictobj = I.get_var(dictvar, true);
 	}
 	lastdict = root = dictobj;
 	while (keys.length > 0) {
@@ -51,7 +49,7 @@ function resolve_keypath(interp, dictobj, keys, create, dictvar) {
 		if (lastdict[key] === undefined) {
 			if (create === true) {
 				dictobj.bytes = null;
-				lastdict[key] = tclobj.NewDict();
+				lastdict[key] = new DictObj();
 				lastdict[key].IncrRefCount();
 			} else if (keys.length > 0) {
 				throw new TclError('key "'+key+'" not known in dictionary',
@@ -69,19 +67,12 @@ function resolve_keypath(interp, dictobj, keys, create, dictvar) {
 	};
 }
 
-function glob2regex(glob) {
-	var re = String(glob).replace(/([.+\^$\\(){}|\-])/g, '\\$1');
-	re = re.replace(/\*/g, '.*');
-	re = re.replace(/\?/g, '.');
-	return new RegExp(re);
-}
-
 subcmds = {
-	append: function(args){
-		this.checkArgs(args, [3, null], 'dictionaryVariable key ?string ...?');
+	append: function(c, args, I){
+		I.checkArgs(args, [3, null], 'dictionaryVariable key ?string ...?');
 		args.shift();
 		var dictvar = args.shift(),
-			dictobj = this.get_var(dictvar, true),
+			dictobj = I.get_var(dictvar, true),
 			dictval,
 			key = args.shift(),
 			strings = args, newval;
@@ -97,31 +88,31 @@ subcmds = {
 		}
 		dictval[key] = tclobj.NewObj(newval);
 		dictval[key].IncrRefCount();
-		return dictobj;
+		return c(dictobj);
 	},
-	create: function(args){
-		return new tclobj.NewDict(args.slice(1));
+	create: function(c, args){
+		return c(new DictObj(args.slice(1)));
 	},
-	exists: function(args){
-		this.checkArgs(args, [3, null], 'dictionaryValue key ?key ...? value');
+	exists: function(c, args, I){
+		I.checkArgs(args, [3, null], 'dictionaryValue key ?key ...? value');
 		args.shift();
 		var dictobj = args.shift(),
 			keys = args,
-			kinfo = resolve_keypath(this, dictobj, keys);
-		return kinfo.lastdict[kinfo.key] !== undefined;
+			kinfo = resolve_keypath(I, dictobj, keys);
+		return c(kinfo.lastdict[kinfo.key] !== undefined);
 	},
-	filter: function(args, interp){
-		this.checkArgs(args, [2, null], 'dictionaryValue filterType arg ?arg ...?');
+	filter: function(c, args, I){
+		I.checkArgs(args, [2, null], 'dictionaryValue filterType arg ?arg ...?');
 		args.shift();
 		var dictobj = args.shift(),
 			dictvals = dictobj.GetDict(),
-			out = tclobj.NewDict(),
+			out = new DictObj(),
 			outdictvals = out.GetDict(),
 			filterType = args.shift();
 		function filter_key(){
-			var regexes = [], i, j, keys = objkeys(dictvals), key, re;
+			var regexes = [], i, j, keys = utils.objkeys(dictvals), key, re;
 			for (i=0; i<args.length; i++) {
-				regexes.push(glob2regex(args[i]));
+				regexes.push(utils.glob2regex(args[i]));
 			}
 			for (i=0; i<keys.length; i++) {
 				key = keys[i];
@@ -134,12 +125,12 @@ subcmds = {
 					}
 				}
 			}
-			return out;
+			return c(out);
 		}
 		function filter_script(){
 			var e, loopvars = args[0].GetList(), body = args[1],
-				keyvar, valuevar, pairs = [], promise;
-			interp.checkArgs(args, 2, 'dictionaryValue script {keyVar valueVar} script');
+				keyvar, valuevar, pairs = [], i = 0;
+			I.checkArgs(args, 2, 'dictionaryValue script {keyVar valueVar} script');
 			if (loopvars.length !== 2) {
 				throw new TclError('must have exactly two variable names');
 			}
@@ -151,41 +142,35 @@ subcmds = {
 				}
 			}
 
-			promise = new Promise();
-			function next_loop(k, v) {
-				if (k === undefined) {
-					return promise.resolve(out);
-				}
-				interp.set_scalar(keyvar, k);
-				interp.set_scalar(valuevar, v);
-				interp.TclEval(body).then(function(res){
-					if (res.code === types.RETURN) {
-						return promise.resolve(res);
+			return function next_loop() {
+				if (i >= pairs.length) {return c(out);}
+				var k = pairs[i++],
+					v = pairs[i++];
+
+				I.set_scalar(keyvar, k);
+				I.set_scalar(valuevar, v);
+				return I.TclEval(body, function(res){
+					switch (res.code) {
+						case types.OK:			
+							if (tcllist.bool(res.result.toString())) {
+								outdictvals[k] = dictvals[k];
+								outdictvals[k].IncrRefCount();
+							}
+							return next_loop;
+						case types.RETURN:		return c(res);
+						case types.BREAK:		return c(out);
+						case types.CONTINUE:	return next_loop;
+						case types.ERROR:		return c(res);
+						default:
+							return c(new TclError('Unhandled return code ('+res.code+')'));
 					}
-					if (tcllist.bool(res.result.toString())) {
-						outdictvals[k] = dictvals[k];
-						outdictvals[k].IncrRefCount();
-					}
-					return new TailCall(next_loop, [pairs.shift(), pairs.shift()]);
-				}, function(res){
-					if (res.code === types.BREAK) {
-						return promise.resolve(out);
-					}
-					if (res.code === types.CONTINUE) {
-						return new TailCall(next_loop, [pairs.shift(), pairs.shift()]);
-					}
-					return promise.reject(res);
 				});
-			}
-
-			next_loop(pairs.shift(), pairs.shift());
-
-			return promise;
+			};
 		}
 		function filter_value(){
-			var regexes = [], i, j, keys = objkeys(dictvals), key, re;
+			var regexes = [], i, j, keys = utils.objkeys(dictvals), key, re;
 			for (i=0; i<args.length; i++) {
-				regexes.push(glob2regex(args[i]));
+				regexes.push(utils.glob2regex(args[i]));
 			}
 			for (i=0; i<keys.length; i++) {
 				key = keys[i];
@@ -198,22 +183,20 @@ subcmds = {
 					}
 				}
 			}
-			return out;
+			return c(out);
 		}
 		switch (filterType) {
-			case 'key': return filter_key();
-			case 'script': return filter_script();
-			case 'value': return filter_value();
+			case 'key':		return filter_key();
+			case 'script':	return filter_script();
+			case 'value':	return filter_value();
 			default: throw new TclError('bad filterType "'+filterType+'": must be key, script, or value', 'TCL', 'LOOKUP', 'INDEX', 'filterType', filterType);
 		}
 	},
-	'for': function(args, interp){
-		this.checkArgs(args, 3, '{keyVar valueVar} dictionary script');
-		args.shift();
-		var loopvars = args.shift().GetList(),
-			dictval = args.shift().GetDict(),
-			body = args.shift(),
-			keyvar, valuevar, e, pairs = [], promise;
+	'for': function(c, args, I){
+		I.checkArgs(args, 3, '{keyVar valueVar} dictionary script');
+		var loopvars = args[1].GetList(),
+			dictval = args[2].GetDict(),
+			body = args[3], keyvar, valuevar, e, pairs = [], i = 0;
 		if (loopvars.length !== 2) {
 			throw new TclError('must have exactly two variable names');
 		}
@@ -227,68 +210,60 @@ subcmds = {
 			}
 		}
 
-		promise = new Promise();
+		return function next_loop() {
+			if (i === pairs.length) {return c();}
+			var k = pairs[i++],
+				v = pairs[i++];
 
-		function next_loop(k, v) {
-			if (k === undefined) {
-				return promise.resolve();
-			}
-			interp.set_scalar(keyvar, k);
-			interp.set_scalar(valuevar, v);
-			interp.TclEval(body).then(function(){
-				return new TailCall(next_loop, [pairs.shift(), pairs.shift()]);
-			}, function(res){
-				if (res.code === types.BREAK) {
-					return promise.resolve();
+			I.set_scalar(keyvar, k);
+			I.set_scalar(valuevar, v);
+			I.TclEval(body, function(res){
+				switch (res.code) {
+					case types.CONTINUE:
+					case types.OK:			return next_loop;
+					case types.BREAK:		return c();
+					case types.ERROR:		return c(res);
 				}
-				if (res.code === types.CONTINUE) {
-					return new TailCall(next_loop, [pairs.shift(), pairs.shift()]);
-				}
-				return promise.reject(res);
 			});
-		}
-
-		next_loop(pairs.shift(), pairs.shift());
-
-		return promise;
+		};
 	},
-	get: function(args){
+	get: function(c, args, I){
 		this.checkArgs(args, [1, null], 'dictionaryValue ?key ...?');
 		args.shift();
 		var dictobj = args.shift(),
 			keys = args,
-			kinfo = resolve_keypath(this, dictobj, keys);
+			kinfo = resolve_keypath(I, dictobj, keys);
 		if (kinfo.value === undefined) {
 			throw new TclError('key "'+kinfo.key+'" not known in dictionary',
 				'TCL', 'LOOKUP', 'DICT', kinfo.key);
 		}
-		return kinfo.value;
+		return c(kinfo.value);
 	},
-	incr: function(args){
+	incr: function(c, args, I){
 		this.checkArgs(args, [2, 3], 'dictionaryVariable key ?increment?');
 		var dictvar = args[1],
-			dictobj = this.get_var(dictvar, true),
-			dictval,
+			dictobj = I.get_var(dictvar, true),
+			dictval = dictobj.GetDict(),
 			key = args[2],
 			increment = Number(args[3]) || 1;
-		dictval = dictobj.GetDict();
 		dictobj.bytes = null;
+		make_unshared(dictval, key);
 		dictval[key].GetInt();
 		dictval[key].jsval += increment;
-		return dictval[key];
+		return c(dictval[key]);
 	},
-	info: function(){
-		return 'Nothing interesting to report';
+	info: function(c){
+		return c('Nothing interesting to report');
 	},
-	keys: function(args){
-		this.checkArgs(args, [1, 2], 'dictionaryValue ?globPattern?');
+	keys: function(c, args, I){
+		I.checkArgs(args, [1, 2], 'dictionaryValue ?globPattern?');
 		args.shift();
 		var dictobj = args.shift(),
 			glob = args.shift(),
-			re, i, keys = objkeys(dictobj.GetDict()), out;
+			re, i, keys = utils.objkeys(dictobj.GetDict()), out;
 
 		if (glob !== undefined) {
-			re = glob2regex(glob.toString());
+			re = utils.glob2regex(glob.toString());
 			out = [];
 			for (i=0; i<keys.length; i++) {
 				if (re.test(keys[i])) {
@@ -298,32 +273,34 @@ subcmds = {
 		} else {
 			out = keys;
 		}
-		return out;
+		return c(out);
 	},
-	lappend: function(args){
-		this.checkArgs(args, [2, null], 'dictionaryVariable key ?value ...?');
+	lappend: function(c, args, I){
+		I.checkArgs(args, [2, null], 'dictionaryVariable key ?value ...?');
 		args.shift();
 		var dictvar = args.shift(),
-			dictobj = this.get_var(dictvar, true),
-			dictval,
+			dictobj = I.get_var(dictvar, true),
+			dictval = dictobj.GetDict(),
 			key = args.shift(),
 			values = args, newlist;
-		dictval = dictobj.GetDict();
 		dictobj.bytes = null;
 		if (dictval[key] === undefined) {
-			dictval[key] = tclobj.NewList();
+			dictval[key] = new ListObj();
+			dictval[key].IncrRefCount();
 		}
+		make_unshared(dictval, key);
 		newlist = dictval[key].GetList().concat(values);
-		dictval[key] = newlist;
-		return dictobj;
+		dictval[key].bytes = null;
+		dictval[key].jsval = newlist;
+		return c(dictobj);
 	},
-	map: function(args, interp){
-		this.checkArgs(args, 3, '{keyVar valueVar} dictionary script');
-		args.shift();
-		var loopvars = args.shift().GetList(),
-			dictval = args.shift().GetDict(),
-			body = args.shift(),
-			keyvar, valuevar, e, pairs = [], promise, accum = [];
+	map: function(c, args, I){
+		I.checkArgs(args, 3, '{keyVar valueVar} dictionary script');
+		var loopvars = args[1].GetList(),
+			dictval = args[2].GetDict(),
+			body = args[3],
+			keyvar, valuevar, e, pairs = [], accum = [], i = 0;
+
 		if (loopvars.length !== 2) {
 			throw new TclError('must have exactly two variable names');
 		}
@@ -337,33 +314,27 @@ subcmds = {
 			}
 		}
 
-		promise = new Promise();
-
-		function next_loop(k, v) {
-			if (k === undefined) {
-				return promise.resolve(accum);
-			}
-			interp.set_scalar(keyvar, k);
-			interp.set_scalar(valuevar, v);
-			interp.TclEval(body).then(function(res){
-				accum.push(res.result);
-				return new TailCall(next_loop, [pairs.shift(), pairs.shift()]);
-			}, function(res){
-				if (res.code === types.BREAK) {
-					return promise.resolve(accum);
+		return function next_loop() {
+			if (i >= pairs.length) {return c(accum);}
+			var k = pairs[i++],
+				v = pairs[i++];
+			I.set_scalar(keyvar, k);
+			I.set_scalar(valuevar, v);
+			I.TclEval(body, function(res){
+				switch (res.code) {
+					case types.OK:
+						accum.push(res.result);
+						return next_loop;
+					case types.BREAK:		return c(accum);
+					case types.CONTINUE:	return next_loop;
+					case types.ERROR:		return c(res);
+					default:
+						return c(new TclError('Unexpected result code: ('+res.code+')'));
 				}
-				if (res.code === types.CONTINUE) {
-					return new TailCall(next_loop, [pairs.shift(), pairs.shift()]);
-				}
-				return promise.reject(res);
 			});
-		}
-
-		next_loop(pairs.shift(), pairs.shift());
-
-		return promise;
+		};
 	},
-	merge: function(args){
+	merge: function(c, args){
 		var out = {}, e, dictval, arg;
 		args.shift();
 		while (args.length) {
@@ -375,13 +346,13 @@ subcmds = {
 				}
 			}
 		}
-		return tclobj.NewDict(out);
+		return c(new DictObj(out));
 	},
-	remove: function(args){
-		this.checkArgs(args, [1, null], 'dictionaryValue ?key ...?');
+	remove: function(c, args, I){
+		I.checkArgs(args, [1, null], 'dictionaryValue ?key ...?');
 		args.shift();
 		var dictobj = args.shift(), keys = args, dictval, i;
-		if (keys.length === 0) {return dictobj;}
+		if (keys.length === 0) {return c(dictobj);}
 		dictobj = dictobj.DuplicateObj();
 		dictval = dictobj.GetDict();
 		dictobj.bytes = null;
@@ -391,13 +362,13 @@ subcmds = {
 				delete dictval[keys[i]];
 			}
 		}
-		return dictobj;
+		return c(dictobj);
 	},
-	replace: function(args){
-		this.checkArgs(args, [1, null], 'dictionaryValue ?key value ...?');
+	replace: function(c, args, I){
+		I.checkArgs(args, [1, null], 'dictionaryValue ?key value ...?');
 		args.shift();
 		var dictobj = args.shift(), pairs = args, i, key, val, dictval;
-		if (pairs.length === 0) {return dictobj;}
+		if (pairs.length === 0) {return c(dictobj);}
 		if (pairs.length % 2 !== 0) {
 			throw new TclError('wrong # args: should be "dict replace dictionary ?key value ...?"',
 				'TCL', 'WRONGARGS');
@@ -408,20 +379,24 @@ subcmds = {
 		for (i=0; i<pairs.length; i+=2) {
 			key = pairs[i];
 			val = pairs[i+1];
+			if (dictval[key] !== undefined) {
+				dictval[key].DecrRefCount();
+			}
 			dictval[key] = val;
+			dictval[key].IncrRefCount();
 		}
-		return dictobj;
+		return c(dictobj);
 	},
-	set: function(args){
-		this.checkArgs(args, [3, null], 'dictionaryVariable key ?key ...? value');
+	set: function(c, args, I){
+		I.checkArgs(args, [3, null], 'dictionaryVariable key ?key ...? value');
 		args.shift();
 		var dictvar = args.shift(),
-			dictobj = this.get_var(dictvar),
+			dictobj = I.get_var(dictvar),
 			keys = args.slice(0, args.length-1),
 			value = args[args.length-1],
 			kinfo;
 
-		kinfo = resolve_keypath(this, dictobj, keys, true, dictvar);
+		kinfo = resolve_keypath(I, dictobj, keys, true, dictvar);
 		kinfo.root.bytes = null;
 
 		if (kinfo.lastdict[kinfo.key] !== undefined) {
@@ -429,50 +404,48 @@ subcmds = {
 		}
 		kinfo.lastdict[kinfo.key] = tclobj.AsObj(value);
 		kinfo.lastdict[kinfo.key].IncrRefCount();
-		return kinfo.root;
+		return c(kinfo.root);
 	},
-	size: function(args){
-		this.checkArgs(1, 'dictionaryValue');
-		return objkeys(objkeys(args[1].GetDict()).length);
+	size: function(c, args, I){
+		I.checkArgs(1, 'dictionaryValue');
+		return c(utils.objkeys(args[1].GetDict()).length);
 	},
-	unset: function(args){
-		this.checkArgs(args, [3, null], 'dictionaryVariable key ?key ...? value');
+	unset: function(c, args, I){
+		I.checkArgs(args, [3, null], 'dictionaryVariable key ?key ...? value');
 		args.shift();
 		var dictvar = args.shift(),
-			dictobj = this.get_var(dictvar, true),
-			keys = args,
-			kinfo;
+			dictobj = I.get_var(dictvar, true),
+			keys = args, kinfo;
 
-		kinfo = resolve_keypath(this, dictobj, keys, false, dictvar);
+		kinfo = resolve_keypath(I, dictobj, keys, false, dictvar);
 		if (kinfo.lastdict[kinfo.key] !== undefined) {
 			kinfo.lastdictobj.bytes = null;
 			kinfo.lastdict[kinfo.key].DecrRefCount();
 			delete kinfo.lastdict[kinfo.key];
 		}
-		return kinfo.root;
+		return c(kinfo.root);
 	},
-	update: function(args, interp){
-		this.checkArgs(args, [4, null], 'dictionaryVariable key varName ?key Varname ...? body');
+	update: function(c, args, I){
+		I.checkArgs(args, [4, null], 'dictionaryVariable key varName ?key Varname ...? body');
 		args.shift();
 		var dictvar = args.shift(),
-			dictobj = this.get_var(dictvar),
+			dictobj = I.get_var(dictvar),
 			pairs = args.slice(0, args.length-1),
 			body = args[args.length-1],
-			dictval, vars, i, promise;
+			dictval, vars, i;
 		if (pairs.length % 2 !== 0) {
 			throw new TclError('wrong # args: should be "dict update varName key varName ?key varName ...? script"',
 				'TCL', 'WRONGARGS');
 		}
 		dictval = dictobj.GetDict();
 		for (i=0; i<pairs.length; i+=2) {
-			this.set_scalar(pairs[i+1], dictval[pairs[i]]);
+			I.set_scalar(pairs[i+1], dictval[pairs[i]]);
 		}
-		promise = new Promise();
 
 		function apply_updates(){
 			var i, dictobj, dictval, varname, key;
 			try {
-				dictobj = interp.get_var(dictvar);
+				dictobj = I.get_var(dictvar);
 			} catch(e){
 				if (e instanceof types.TclError && /^TCL LOOKUP (DICT)|(VARNAME) /.test(e.errorcode.join(' '))) {
 					return;
@@ -481,7 +454,7 @@ subcmds = {
 			}
 			if (dictobj.IsShared()) {
 				dictobj = dictobj.DuplicateObj();
-				interp.set_var(dictvar, dictobj);
+				I.set_var(dictvar, dictobj);
 			}
 			dictval = dictobj.GetDict();
 			dictobj.bytes = null;
@@ -492,40 +465,32 @@ subcmds = {
 					dictval[key].DecrRefCount();
 					delete dictval[key];
 				}
-				if (interp.scalar_exists(varname)) {
-					dictval[key] = interp.get_scalar(varname);
+				if (I.scalar_exists(varname)) {
+					dictval[key] = I.get_scalar(varname);
 					dictval[key].IncrRefCount();
 				}
 			}
 		}
 
-		this.TclEval(body).then(function(res){
+		return I.TclEval(body, function(res){
 			try {
 				apply_updates();
 			} catch(e2){
-				return promise.reject(e2);
+				res = e2 instanceof TclError ? e2 : new TclError(e2);
 			}
-			return promise.resolve(res);
-		}, function(res){
-			try {
-				apply_updates();
-			} catch(e2){
-				return promise.reject(e2);
-			}
-			return promise.reject(res);
+			return c(res);
 		});
-		return promise;
 	},
-	values: function(args){
-		this.checkArgs(args, [1, 2], 'dictionaryValue ?globPattern?');
+	values: function(c, args, I){
+		I.checkArgs(args, [1, 2], 'dictionaryValue ?globPattern?');
 		args.shift();
 		var dictobj = args.shift(),
 			dictval = dictobj.GetDict(),
 			glob = args.shift(),
-			re, e, i, keys = objkeys(dictval), out;
+			re, e, i, keys = utils.objkeys(dictval), out;
 
 		if (glob !== undefined) {
-			re = glob2regex(glob.toString());
+			re = utils.glob2regex(glob.toString());
 			out = [];
 			for (i=0; i<keys.length; i++) {
 				if (re.test(keys[i])) {
@@ -540,30 +505,29 @@ subcmds = {
 				}
 			}
 		}
-		return out;
+		return c(new ListObj(out));
 	},
-	'with': function(args, interp){
-		this.checkArgs(args, [2, null], 'dictionaryVariable ?key ...? body');
+	'with': function(c, args, I){
+		I.checkArgs(args, [2, null], 'dictionaryVariable ?key ...? body');
 		args.shift();
 		var dictvar = args.shift(),
-			dictobj = this.get_var(dictvar),
+			dictobj = I.get_var(dictvar),
 			keys = args.slice(0, args.length-1),
 			body = args[args.length-1],
-			dictval, vars, i, promise, kinfo;
-		kinfo = resolve_keypath(this, dictobj, keys, false, dictvar);
+			dictval, vars, i, kinfo;
+		kinfo = resolve_keypath(I, dictobj, keys, false, dictvar);
 		dictobj = kinfo.value;
 		dictval = dictobj.GetDict();
-		vars = objkeys(dictval);
+		vars = utils.objkeys(dictval);
 		for (i=0; i<vars.length; i++) {
-			this.set_scalar(vars[i], dictval[vars[i]]);
+			I.set_scalar(vars[i], dictval[vars[i]]);
 		}
-		promise = new Promise();
 
 		function apply_updates(){
 			var i, dictobj, dictval, varname;
 			try {
-				dictobj = interp.get_var(dictvar);
-				kinfo = resolve_keypath(interp, dictobj, keys, false, dictvar);
+				dictobj = I.get_var(dictvar);
+				kinfo = resolve_keypath(I, dictobj, keys, false, dictvar);
 			} catch(e){
 				if (e instanceof types.TclError && /^TCL LOOKUP (DICT)|(VARNAME) /.test(e.errorcode.join(' '))) {
 					return;
@@ -579,36 +543,28 @@ subcmds = {
 					dictval[varname].DecrRefCount();
 					delete dictval[varname];
 				}
-				if (interp.scalar_exists(varname)) {
-					dictval[varname] = interp.get_scalar(varname);
+				if (I.scalar_exists(varname)) {
+					dictval[varname] = I.get_scalar(varname);
 					dictval[varname].IncrRefCount();
 				}
 			}
 		}
 
-		this.TclEval(body).then(function(res){
+		return I.TclEval(body, function(res){
 			try {
 				apply_updates();
 			} catch(e2){
-				return promise.reject(e2);
+				res = e2 instanceof TclError ? e2 : new TclError(e2);
 			}
-			return promise.resolve(res);
-		}, function(res){
-			try {
-				apply_updates();
-			} catch(e2){
-				return promise.reject(e2);
-			}
-			return promise.reject(res);
+			return c(res);
 		});
-		return promise;
 	}
 };
 
 function install(interp) {
 	if (interp.register_extension('ex_dict_cmds')) {return;}
 
-	interp.registerCommand('dict', function(args){
+	interp.registerCommand('dict', function(c, args){
 		var subcmd, cmd;
 		if (args.length < 2) {
 			interp.checkArgs(args, 1, 'subcmd args');
@@ -617,10 +573,10 @@ function install(interp) {
 		cmd = args.shift(); subcmd = args.shift();
 		args.unshift(cmd+' '+subcmd);
 		if (subcmds[subcmd] === undefined) {
-			throw new TclError('unknown or ambiguous subcommand "'+subcmd+'": must be '+objkeys(subcmds).join(', '),
+			throw new TclError('unknown or ambiguous subcommand "'+subcmd+'": must be '+utils.objkeys(subcmds).join(', '),
 				'TCL', 'LOOKUP', 'SUBCOMMAND', subcmd);
 		}
-		return subcmds[subcmd].apply(interp, [args, interp]);
+		return subcmds[subcmd](c, args, interp);
 	});
 }
 

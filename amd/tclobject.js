@@ -12,7 +12,7 @@ jsvalhandlers = {
 		obj.jsval = null;
 	},
 	dupJsVal: function(obj){
-		// TODO: clone jsval
+		return obj.jsval;
 	},
 	updateString: function(obj){
 		obj.bytes = obj.jsval.toString();

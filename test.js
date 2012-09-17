@@ -196,6 +196,6 @@ require([
 	});
 
 	query('#cs1').on('click', function(){
-		run('if {[getstring] eq "result of getstring"} {puts true} else {puts false}');
+		run('if {[getstring] eq "result of getstring"} {puts "then body"} else {puts "else body"}');
 	});
 });

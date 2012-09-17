@@ -52,8 +52,6 @@ listhandlers = {
 		}
 		obj.FreeJsVal();
 		obj.jsval = jsval;
-		obj.bytes = null;
-		obj.handlers = listhandlers;
 	}
 };
 

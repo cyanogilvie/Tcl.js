@@ -70,6 +70,7 @@ TclObjectBase = {
 		if (this.handlers.type === type) {return;}
 		objtypes[type].setFromAny(this);
 		this.handlers = objtypes[type];
+		this.bytes = null;
 	}
 };
 
@@ -96,6 +97,8 @@ NewObj = function(type, value) {
 	if (type === 'auto') {
 		if (value instanceof Array) {
 			type = 'list';
+		} else if (typeof value === 'object') {
+			type = 'dict';
 		} else {
 			type = 'jsval';
 		}

@@ -41,7 +41,8 @@ var TclError = types.TclError,
 	EXPR = parser.EXPR,
 	VAR = parser.VAR,
 	INDEX = parser.INDEX,
-	ARG = parser.ARG;
+	ARG = parser.ARG,
+	EmptyString = types.EmptyString;
 
 function asTclError(e) {
 	return e instanceof TclError ? e : new TclError(e);
@@ -355,8 +356,9 @@ return function(/* extensions... */){
 				if (command.cinfo.async) {
 					return command.cinfo.handler(function(result){
 						try {
-							while (typeof result === 'function') { // Support tailcalls
-								result = command.cinfo.handler(args, self, command.priv);
+							while (typeof result === 'function') {
+								// Support tailcalls
+								result = result();
 							}
 							self._trampoline(got_result(result));
 						} catch(e2){
@@ -364,9 +366,11 @@ return function(/* extensions... */){
 						}
 					}, args, self, command.priv);
 				}
-				do { // Support tailcalls
-					result = command.cinfo.handler(args, self, command.priv);
-				} while (typeof result === 'function');
+				result = command.cinfo.handler(args, self, command.priv);
+				while (typeof result === 'function') {
+					// Support tailcalls
+					result = result();
+				}
 			} catch(e) {
 				result = e;
 			}

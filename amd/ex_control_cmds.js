@@ -3,10 +3,12 @@
 
 define([
 	'./types',
-	'./list'
+	'./list',
+	'./objtype_bool'
 ], function(
 	types,
-	tcllist
+	tcllist,
+	BoolObj
 ){
 'use strict';
 
@@ -23,18 +25,18 @@ function install(interp){
 		interp.checkArgs(args, [3, null], 'expression script ?args ...?');
 		var i = 1;
 
-		function next(){
-			interp.TclExpr(args[i++], function(res){
-				if (tcllist.bool(res)) {
+		return function next(){
+			return interp._TclExpr(args[i++], function(res){
+				if (res.result.GetBool()) {
 					if (args[i].toString() === 'then') {i++;}
-					return interp.TclEval(args[i], c);
+					return interp.exec(args[i], c);
 				}
 				i++; // skip then body
 				switch (args[i++].toString()) {
 					case undefined:	return c('');
-					case 'elseif':	return next();
-					case 'else':	return interp.TclEval(args[i], c);
-					default:		return interp.TclEval(args[i-1], c);
+					case 'elseif':	return next;
+					case 'else':	return interp.exec(args[i], c);
+					default:		return interp.exec(args[i-1], c);
 				}
 			}, function(err){
 				if (!(err instanceof TclError)) {
@@ -43,7 +45,6 @@ function install(interp){
 				c(err);
 			});
 		};
-		return next();
 	});
 }
 

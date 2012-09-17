@@ -35,8 +35,6 @@ var expr_handlers = {
 		var newjsval = jsval_from_string(obj.toString());
 		obj.FreeJsVal();
 		obj.jsval = newjsval;
-		obj.bytes = null;
-		obj.handlers = expr_handlers;
 	}
 };
 

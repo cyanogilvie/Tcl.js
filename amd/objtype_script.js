@@ -101,8 +101,6 @@ var script_handlers = {
 		var newjsval = jsval_from_string(obj.toString());
 		obj.FreeJsVal();
 		obj.jsval = newjsval;
-		obj.bytes = null;
-		obj.handlers = script_handlers;
 	}
 };
 

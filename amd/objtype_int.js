@@ -12,8 +12,11 @@ define([
 
 var inthandlers = {
 	type: 'int',
-	dupJsVal: function(){
-		return this.jsval;
+	dupJsVal: function(obj){
+		return obj.jsval;
+	},
+	valueOf: function(obj){
+		return obj.jsval;
 	},
 	updateString: function(obj){
 		obj.bytes = String(obj.jsval);
@@ -22,8 +25,6 @@ var inthandlers = {
 		obj.handlers.updateString(obj);
 		obj.FreeJsVal();
 		obj.jsval = Number(obj.bytes);
-		obj.bytes = null;
-		obj.handlers = inthandlers;
 	}
 };
 

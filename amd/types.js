@@ -10,12 +10,19 @@ var types = {
 	ERROR: 1,
 	RETURN: 2,
 	BREAK: 3,
-	CONTINUE: 4
+	CONTINUE: 4,
+
+	EmptyString: tclobj.NewString('')
 };
+
+types.EmptyString.IncrRefCount();
 
 function TclResult(code, result, options) {
 	this.code = code;
-	this.result = tclobj.AsObj(result !== undefined ? result : '');
+	if (result === undefined || (typeof result === 'string' && result === '')) {
+		result = types.EmptyString;
+	}
+	this.result = tclobj.AsObj(result);
 	this.options = options || {};
 	this.options.code = code;
 	this.toString = function(){

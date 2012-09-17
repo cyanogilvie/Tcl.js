@@ -149,7 +149,7 @@ subcmds = {
 
 				I.set_scalar(keyvar, k);
 				I.set_scalar(valuevar, v);
-				return I.TclEval(body, function(res){
+				return I.exec(body, function(res){
 					switch (res.code) {
 						case types.OK:			
 							if (tcllist.bool(res.result.toString())) {
@@ -217,7 +217,7 @@ subcmds = {
 
 			I.set_scalar(keyvar, k);
 			I.set_scalar(valuevar, v);
-			I.TclEval(body, function(res){
+			I.exec(body, function(res){
 				switch (res.code) {
 					case types.CONTINUE:
 					case types.OK:			return next_loop;
@@ -228,7 +228,7 @@ subcmds = {
 		};
 	},
 	get: function(c, args, I){
-		this.checkArgs(args, [1, null], 'dictionaryValue ?key ...?');
+		I.checkArgs(args, [1, null], 'dictionaryValue ?key ...?');
 		args.shift();
 		var dictobj = args.shift(),
 			keys = args,
@@ -240,7 +240,7 @@ subcmds = {
 		return c(kinfo.value);
 	},
 	incr: function(c, args, I){
-		this.checkArgs(args, [2, 3], 'dictionaryVariable key ?increment?');
+		I.checkArgs(args, [2, 3], 'dictionaryVariable key ?increment?');
 		var dictvar = args[1],
 			dictobj = I.get_var(dictvar, true),
 			dictval = dictobj.GetDict(),
@@ -320,7 +320,7 @@ subcmds = {
 				v = pairs[i++];
 			I.set_scalar(keyvar, k);
 			I.set_scalar(valuevar, v);
-			I.TclEval(body, function(res){
+			I.exec(body, function(res){
 				switch (res.code) {
 					case types.OK:
 						accum.push(res.result);
@@ -472,7 +472,7 @@ subcmds = {
 			}
 		}
 
-		return I.TclEval(body, function(res){
+		return I.exec(body, function(res){
 			try {
 				apply_updates();
 			} catch(e2){
@@ -550,7 +550,7 @@ subcmds = {
 			}
 		}
 
-		return I.TclEval(body, function(res){
+		return I.exec(body, function(res){
 			try {
 				apply_updates();
 			} catch(e2){
@@ -564,7 +564,7 @@ subcmds = {
 function install(interp) {
 	if (interp.register_extension('ex_dict_cmds')) {return;}
 
-	interp.registerCommand('dict', function(c, args){
+	interp.registerAsyncCommand('dict', function(c, args){
 		var subcmd, cmd;
 		if (args.length < 2) {
 			interp.checkArgs(args, 1, 'subcmd args');

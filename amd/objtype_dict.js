@@ -75,8 +75,6 @@ var dicthandlers = {
 		}
 		obj.FreeJsVal();
 		obj.jsval = d;
-		obj.bytes = null;
-		obj.handlers = dicthandlers;
 	}
 };
 

@@ -19,10 +19,20 @@ var dicthandlers = {
 		for (e in obj.jsval) {
 			if (obj.jsval.hasOwnProperty(e)) {
 				newval[e] = obj.jsval[e];
+				newval[e].IncrRefCount();
 			}
 		}
 		return newval;
 		//return from_string(obj.GetString());
+	},
+	freeJsVal: function(obj){
+		var e;
+		for (e in obj.jsval) {
+			if (obj.jsval.hasOwnProperty(e)) {
+				obj.jsval[e].DecrRefCount();
+			}
+		}
+		obj.jsval = null;
 	},
 	updateString: function(obj){
 		var e, a = [];
@@ -61,6 +71,7 @@ var dicthandlers = {
 		}
 		for (i=0; i<a.length; i+=2) {
 			d[a[i]] = tclobj.AsObj(a[i+1]);
+			d[a[i]].IncrRefCount();
 		}
 		obj.FreeJsVal();
 		obj.jsval = d;
@@ -83,7 +94,7 @@ function DictObj(value) {
 			this.jsval[value[i]].IncrRefCount();
 		}
 	} else if (typeof value === 'object') {
-		this.jsval = {}
+		this.jsval = {};
 		for (e in value) {
 			if (value.hasOwnProperty(e)) {
 				this.jsval[e] = tclobj.AsObj(value[e]);

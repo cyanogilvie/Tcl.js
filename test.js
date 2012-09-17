@@ -194,4 +194,8 @@ require([
 		//expr('6 + -3 + 43 - 4');
 		//expr('2+-min(3, 4)+[get_num]');
 	});
+
+	query('#cs1').on('click', function(){
+		run('if {[getstring] eq "result of getstring"} {puts true} else {puts false}');
+	});
 });

@@ -43,9 +43,13 @@ var TclError = types.TclError,
 	INDEX = parser.INDEX,
 	ARG = parser.ARG;
 
+function asTclError(e) {
+	return e instanceof TclError ? e : new TclError(e);
+}
+
 return function(/* extensions... */){
-	var args = Array.prototype.slice.call(arguments), i,
-		self = this, mathops, mathfuncs;
+	var args = Array.prototype.slice.call(arguments),
+		self = this, mathops, mathfuncs, mathop_cache = [null, {}, {}];
 
 	this.vars = {};
 	this.commands = {};
@@ -224,10 +228,10 @@ return function(/* extensions... */){
 	};
 
 	this.resolve_word = function(tokens, c_ok, c_err) {
-		var parts=[], expand=false, array, self=this, t_i=0;
+		var parts=[], expand=false, array, self=this, i=0;
 
 		return function next_token(){
-			var i, res, index, token = tokens[t_i++];
+			var res, index, token = tokens[i++];
 
 			if (token === undefined) {
 				if (parts.length === 0) {
@@ -286,10 +290,10 @@ return function(/* extensions... */){
 	};
 
 	this.get_words = function(commandline, c_ok, c_err) {
-		var self = this, sofar = [], r_i = 0;
+		var self = this, sofar = [], i = 0;
 
 		return function next_word(){
-			var resolved, next = commandline[r_i++];
+			var resolved, next = commandline[i++];
 
 			if (next === undefined) {
 				if (sofar.length === 0) {return c_ok(sofar);}
@@ -349,27 +353,16 @@ return function(/* extensions... */){
 			}
 			try {
 				if (command.cinfo.async) {
-					result = command.cinfo.handler(function(result){
+					return command.cinfo.handler(function(result){
 						try {
 							while (typeof result === 'function') { // Support tailcalls
 								result = command.cinfo.handler(args, self, command.priv);
 							}
 							self._trampoline(got_result(result));
 						} catch(e2){
-							console.error(e2.stack);
-							debugger;
-							if (!(e2 instanceof TclError)) {
-								e2 = new TclError(e2);
-							}
-							return got_result(e2);
+							return got_result(asTclError(e2));
 						}
 					}, args, self, command.priv);
-					if (result !== undefined) {
-						if (console) {
-							console.warn('Async command handler "'+command.text+'" returned result: "', result, '"');
-						}
-					}
-					return;
 				}
 				do { // Support tailcalls
 					result = command.cinfo.handler(args, self, command.priv);
@@ -422,10 +415,7 @@ return function(/* extensions... */){
 		try {
 			this._trampoline(this.exec(script, c));
 		} catch(e){
-			if (!(e instanceof TclError)) {
-				e = new TclError(e);
-			}
-			c(e.toTclResult());
+			return c(asTclError(e).toTclResult());
 		}
 	};
 
@@ -668,7 +658,6 @@ return function(/* extensions... */){
 		any: {}
 	};
 
-	var mathop_cache = [null, {}, {}];
 	function eval_operator(op, args, c) {
 		var name = op[3], takes = args.length;
 		if (mathops[takes][name] === undefined) {
@@ -697,10 +686,7 @@ return function(/* extensions... */){
 		try {
 			this._trampoline(this._TclExpr(expr, c));
 		} catch(e){
-			if (!(e instanceof TclError)) {
-				e = new TclError(e);
-			}
-			c(e.toTclResult());
+			return c(asTclError(e).toTclResult());
 		}
 	};
 
@@ -755,9 +741,12 @@ return function(/* extensions... */){
 		return true;
 	};
 
-	// Load the extensions
-	for (i=0; i<args.length; i++) {
-		args[i].install(this);
-	}
+	(function(){
+		var i;
+		// Load the extensions
+		for (i=0; i<args.length; i++) {
+			args[i].install(this);
+		}
+	}());
 };
 });

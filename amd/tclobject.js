@@ -20,7 +20,7 @@ jsvalhandlers = {
 	updateJsVal: function(){},
 	setFromAny: function(obj){
 		obj.updateJsVal();
-		obj.bytes = null;
+		obj.InvalidateCaches();
 		obj.handlers = jsvalhandlers;
 	}
 };
@@ -70,7 +70,11 @@ TclObjectBase = {
 		if (this.handlers.type === type) {return;}
 		objtypes[type].setFromAny(this);
 		this.handlers = objtypes[type];
+		this.InvalidateCaches();
+	},
+	InvalidateCaches: function(){
 		this.bytes = null;
+		this.cache = {};
 	}
 };
 
@@ -86,6 +90,7 @@ function TclObject() {
 	this.jsval = null;
 	this.refCount = 0;
 	this.bytes = null;
+	this.cache = {};
 }
 TclObject.prototype = TclObjectBase;
 
@@ -119,7 +124,6 @@ iface = {
 	'TclObjectBase': TclObjectBase,
 	'RegisterObjType': RegisterObjType,
 	'NewObj': NewObj,
-	'NewString': function(value){return NewObj('jsval', String(value));},
 	'AsObj': function(value){return value instanceof TclObject ? value : NewObj('auto', value);},
 	'AsVal': function(value){return value instanceof TclObject ? value.GetJsVal() : value;}
 };

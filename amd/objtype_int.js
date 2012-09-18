@@ -3,10 +3,12 @@
 
 define([
 	'./tclobject',
-	'./types'
+	'./types',
+	'./utils'
 ], function(
 	tclobj,
-	types
+	types,
+	utils
 ){
 'use strict';
 
@@ -22,17 +24,16 @@ var inthandlers = {
 		obj.bytes = String(obj.jsval);
 	},
 	setFromAny: function(obj){
+		var newjsval = utils.to_int(obj);
 		obj.handlers.updateString(obj);
 		obj.FreeJsVal();
-		obj.jsval = Number(obj.bytes);
+		obj.jsval = newjsval;
 	}
 };
 
 function IntObj(value) {
 	this.handlers = inthandlers;
-
-	// TODO: force integer (not float)
-	this.jsval = Number(value);
+	this.jsval = utils.to_int(value);
 }
 IntObj.prototype = new tclobj.TclObject();
 
@@ -48,6 +49,9 @@ types.TclObjectBase.GetInt = function(){
 tclobj.NewInt = function(val){
 	return new IntObj(val);
 };
+
+types.IntOne = new IntObj(1);
+types.IntZero = new IntObj(0);
 
 return IntObj;
 });

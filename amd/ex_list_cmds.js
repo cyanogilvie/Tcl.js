@@ -4,13 +4,19 @@
 define([
 	'./tclobject',
 	'./objtype_list',
+	'./utils',
 
 	'./objtype_int'
 ], function(
 	tclobj,
-	ListObj
+	ListObj,
+	utils
 ){
 'use strict';
+
+function resolve_index(list, obj) {
+	return utils.resolve_idx(list.length, obj);
+}
 
 function install(interp) {
 	var TclError = interp.TclError;
@@ -19,53 +25,6 @@ function install(interp) {
 	/* list commands still to implement:
 	 lsearch linsert lreplace lset lsort
 	 */
-
-	function escape_regex(str) {
-		return String(str).replace(/([\[\].*?+\^$\\(){}|\-])/g, '\\$1');
-	}
-
-	function to_int(str) {
-		var m;
-		if (m = (
-			/^([\+\-])?(0)(\d+)$/i.exec(str) ||
-			/^([\+\-])?()(\d+)e([\-+]?\d+)?$/i.exec(str) ||
-			/^([\+\-])?(0x)([\dA-F]+)$/i.exec(str) ||
-			/^([\+\-])?(0b)([01]+)$/i.exec(str) ||
-			/^([\+\-])?(0o)([0-7]+)$/i.exec(str)
-		)) {
-			// TODO: Bignum support
-			if (m[4] === undefined) {
-				return parseInt((m[1] || '')+m[3],
-					{'': 10, '0x': 16, '0b': 2, '0': 8, '0o': 8}[m[2]]
-				);
-			}
-			return parseInt((m[1] || '')+m[3],
-				{'': 10, '0x': 16, '0b': 2, '0': 8, '0o': 8}[m[2]]
-			) * Math.pow(10, m[4]);
-		}
-	}
-
-	function resolve_index(obj, len) {
-		var idx, a, op, b, matches;
-
-		if (obj.handlers.type === 'int') {
-			return obj.GetInt();
-		}
-
-		idx = obj.GetString();
-		if (matches = /^(.*?)[+\-](.*)$/.exec(idx)) {
-			a = matches[1] === 'end' ? len : to_int(matches[1]);
-			op = matches[2];
-			b = matches[3] === to_int(matches[3]);
-			switch (op) {
-				case '+': return a + b;
-				case '-': return a - b;
-				default: throw new TclError('bad index "'+idx+'": must be integer?[+-]integer? or end?[+-]integer?', 'TCL', 'VALUE', 'INDEX');
-			}
-		}
-
-		return obj.GetInt();
-	}
 
 	interp.registerCommand('lassign', function(args){
 		interp.checkArgs(args, [1, null], 'list ?varname ...?');
@@ -79,8 +38,8 @@ function install(interp) {
 	interp.registerCommand('lrange', function(args){
 		interp.checkArgs(args, 3, 'list first last');
 		var list = args[1].GetList(),
-			a = resolve_index(args[2], list.length),
-			b = resolve_index(args[3], list.length);
+			a = resolve_index(list, args[2]),
+			b = resolve_index(list, args[3]);
 		return new ListObj(list.slice(a, b-a+1));
 	});
 
@@ -94,7 +53,7 @@ function install(interp) {
 		interp.checkArgs(args, 1, 'string ?splitChars?');
 		var re = args[2] === undefined ?
 			/\s/ :
-			new RegExp('['+escape_regex(args[2])+']');
+			new RegExp('['+utils.escape_regex(args[2])+']');
 		return new ListObj(args[1].toString().split(re));
 	});
 
@@ -118,7 +77,7 @@ function install(interp) {
 		if (args.length === 2) {return interp.get_scalar(args[1]);}
 		var listobj = interp.get_scalar(args[1], true), list, i;
 		list = listobj.GetList();
-		listobj.bytes = null;
+		listobj.InvalidateCaches();
 		for (i=2; i<args.length; i++) {
 			list.push(args[i]);
 		}
@@ -142,7 +101,7 @@ function install(interp) {
 
 		for (i=2; i<args.length; i++) {
 			list = obj.GetList();
-			idx = resolve_index(args[i], list.length);
+			idx = resolve_index(list, args[i]);
 			obj = list[idx];
 		}
 		return obj;

@@ -48,12 +48,12 @@ function resolve_keypath(I, dictobj, keys, create, dictvar) {
 		lastdictobj = dictobj;
 		if (lastdict[key] === undefined) {
 			if (create === true) {
-				dictobj.bytes = null;
+				dictobj.InvalidateCaches();
 				lastdict[key] = new DictObj();
 				lastdict[key].IncrRefCount();
 			} else if (keys.length > 0) {
 				throw new TclError('key "'+key+'" not known in dictionary',
-					'TCL', 'LOOKUP', 'DICT', key);
+					['TCL', 'LOOKUP', 'DICT', key]);
 			}
 		}
 		dictobj = lastdict[key];
@@ -78,7 +78,7 @@ subcmds = {
 			strings = args, newval;
 
 		dictval = dictobj.GetDict();
-		dictobj.bytes = null;
+		dictobj.InvalidateCaches();
 
 		if (dictval[key] !== undefined) {
 			newval = dictval[key].toString() + strings.join('');
@@ -189,7 +189,7 @@ subcmds = {
 			case 'key':		return filter_key();
 			case 'script':	return filter_script();
 			case 'value':	return filter_value();
-			default: throw new TclError('bad filterType "'+filterType+'": must be key, script, or value', 'TCL', 'LOOKUP', 'INDEX', 'filterType', filterType);
+			default: throw new TclError('bad filterType "'+filterType+'": must be key, script, or value', ['TCL', 'LOOKUP', 'INDEX', 'filterType', filterType]);
 		}
 	},
 	'for': function(c, args, I){
@@ -235,7 +235,7 @@ subcmds = {
 			kinfo = resolve_keypath(I, dictobj, keys);
 		if (kinfo.value === undefined) {
 			throw new TclError('key "'+kinfo.key+'" not known in dictionary',
-				'TCL', 'LOOKUP', 'DICT', kinfo.key);
+				['TCL', 'LOOKUP', 'DICT', kinfo.key]);
 		}
 		return c(kinfo.value);
 	},
@@ -246,7 +246,7 @@ subcmds = {
 			dictval = dictobj.GetDict(),
 			key = args[2],
 			increment = Number(args[3]) || 1;
-		dictobj.bytes = null;
+		dictobj.InvalidateCaches();
 		make_unshared(dictval, key);
 		dictval[key].GetInt();
 		dictval[key].jsval += increment;
@@ -283,14 +283,14 @@ subcmds = {
 			dictval = dictobj.GetDict(),
 			key = args.shift(),
 			values = args, newlist;
-		dictobj.bytes = null;
+		dictobj.InvalidateCaches();
 		if (dictval[key] === undefined) {
 			dictval[key] = new ListObj();
 			dictval[key].IncrRefCount();
 		}
 		make_unshared(dictval, key);
 		newlist = dictval[key].GetList().concat(values);
-		dictval[key].bytes = null;
+		dictval[key].InvalidateCaches();
 		dictval[key].jsval = newlist;
 		return c(dictobj);
 	},
@@ -355,7 +355,7 @@ subcmds = {
 		if (keys.length === 0) {return c(dictobj);}
 		dictobj = dictobj.DuplicateObj();
 		dictval = dictobj.GetDict();
-		dictobj.bytes = null;
+		dictobj.InvalidateCaches();
 		for (i=0; i<keys.length; i++) {
 			if (dictval.hasOwnProperty(keys[i])) {
 				dictval[keys[i]].DecrRefCount();
@@ -371,11 +371,11 @@ subcmds = {
 		if (pairs.length === 0) {return c(dictobj);}
 		if (pairs.length % 2 !== 0) {
 			throw new TclError('wrong # args: should be "dict replace dictionary ?key value ...?"',
-				'TCL', 'WRONGARGS');
+				['TCL', 'WRONGARGS']);
 		}
 		dictobj = dictobj.DuplicateObj();
 		dictval = dictobj.GetDict();
-		dictobj.bytes = null;
+		dictobj.InvalidateCaches();
 		for (i=0; i<pairs.length; i+=2) {
 			key = pairs[i];
 			val = pairs[i+1];
@@ -397,7 +397,7 @@ subcmds = {
 			kinfo;
 
 		kinfo = resolve_keypath(I, dictobj, keys, true, dictvar);
-		kinfo.root.bytes = null;
+		kinfo.root.InvalidateCaches();
 
 		if (kinfo.lastdict[kinfo.key] !== undefined) {
 			kinfo.lastdict[kinfo.key].DecrRefCount();
@@ -419,7 +419,7 @@ subcmds = {
 
 		kinfo = resolve_keypath(I, dictobj, keys, false, dictvar);
 		if (kinfo.lastdict[kinfo.key] !== undefined) {
-			kinfo.lastdictobj.bytes = null;
+			kinfo.lastdictobj.InvalidateCaches();
 			kinfo.lastdict[kinfo.key].DecrRefCount();
 			delete kinfo.lastdict[kinfo.key];
 		}
@@ -435,7 +435,7 @@ subcmds = {
 			dictval, vars, i;
 		if (pairs.length % 2 !== 0) {
 			throw new TclError('wrong # args: should be "dict update varName key varName ?key varName ...? script"',
-				'TCL', 'WRONGARGS');
+				['TCL', 'WRONGARGS']);
 		}
 		dictval = dictobj.GetDict();
 		for (i=0; i<pairs.length; i+=2) {
@@ -457,7 +457,7 @@ subcmds = {
 				I.set_var(dictvar, dictobj);
 			}
 			dictval = dictobj.GetDict();
-			dictobj.bytes = null;
+			dictobj.InvalidateCaches();
 			for (i=0; i<pairs.length; i+=2) {
 				key = vars[i];
 				varname = vars[i+1];
@@ -536,7 +536,7 @@ subcmds = {
 			}
 			dictobj = kinfo.value;
 			dictval = dictobj.GetDict();
-			dictobj.bytes = null;
+			dictobj.InvalidateCaches();
 			for (i=0; i<vars.length; i++) {
 				varname = vars[i];
 				if (dictval[varname] !== undefined) {
@@ -570,11 +570,11 @@ function install(interp) {
 			interp.checkArgs(args, 1, 'subcmd args');
 		}
 
-		cmd = args.shift(); subcmd = args.shift();
-		args.unshift(cmd+' '+subcmd);
+		cmd = args.shift(); subcmd = args[0];
+		args[0] = cmd+' '+subcmd;
 		if (subcmds[subcmd] === undefined) {
 			throw new TclError('unknown or ambiguous subcommand "'+subcmd+'": must be '+utils.objkeys(subcmds).join(', '),
-				'TCL', 'LOOKUP', 'SUBCOMMAND', subcmd);
+				['TCL', 'LOOKUP', 'SUBCOMMAND', subcmd]);
 		}
 		return subcmds[subcmd](c, args, interp);
 	});

@@ -49,7 +49,7 @@ var boolhandlers = {
 };
 
 function BoolObj(value) {
-	this.handlers = boolthandlers;
+	this.handlers = boolhandlers;
 
 	switch (typeof value) {
 		case 'boolean': this.jsval = value; break;

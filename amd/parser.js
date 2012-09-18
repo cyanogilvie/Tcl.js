@@ -573,10 +573,10 @@ function parse(text, mode) {
 			// invalid bareword
 			if (m = /^\w+\b/.exec(here)) {
 				throw new types.TclError('invalid bareword "'+m[0]+'"',
-					'TCL', 'PARSE', 'EXPR', 'BAREWORD');
+					['TCL', 'PARSE', 'EXPR', 'BAREWORD']);
 			}
 			throw new types.TclError('Cannot parse expression portion: "'+here+'"',
-				'TCL', 'PARSE', 'EXPR', 'GIVEUP');
+				['TCL', 'PARSE', 'EXPR', 'GIVEUP']);
 		}
 	}
 

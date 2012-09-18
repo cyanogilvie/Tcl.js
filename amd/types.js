@@ -12,7 +12,7 @@ var types = {
 	BREAK: 3,
 	CONTINUE: 4,
 
-	EmptyString: tclobj.NewString('')
+	EmptyString: tclobj.NewObj('jsval', '')
 };
 
 types.EmptyString.IncrRefCount();
@@ -24,16 +24,16 @@ function TclResult(code, result, options) {
 	}
 	this.result = tclobj.AsObj(result);
 	this.options = options || {};
-	this.options.code = code;
+	this.options['-code'] = code;
 	this.toString = function(){
 		return this.result.toString();
 	};
 }
 
-function TclError(message) {
-	var errorcode = Array.prototype.slice.call(arguments, 1);
+function TclError(message, errorcode, errorinfo) {
 	this.name = 'TclError';
-	this.errorcode = errorcode.length !== 0 ? errorcode : ['NONE'];
+	this.errorcode = errorcode !== undefined ? errorcode : ['NONE'];
+	this.errorinfo = errorinfo;
 	this.message = message;
 	this.toTclResult = function(){
 		return new TclResult(types.ERROR, String(message), {

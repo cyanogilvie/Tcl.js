@@ -2,9 +2,9 @@
 var profile = (function(){
 	function copyOnly(filename, mid) {
 		return [
-			'tcl.profile',
+			'package.js',
 			'package.json'
-			].indexOf(filename) >=0 ||
+			].indexOf(filename.split('/').pop()) >=0 ||
 			/(png|jpg|jpeg|gif|svg)$/.test(filename);
 	}
 	function test(filename, mid) {

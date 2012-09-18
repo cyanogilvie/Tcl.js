@@ -8,7 +8,9 @@ define([
 	'./types',
 	'./objtype_list',
 	'./objtype_script',
-	'./objtype_expr'
+	'./objtype_expr',
+	'./objtype_int',
+	'./objtype_string'
 ], function(
 	parser,
 	tclobj,
@@ -16,7 +18,9 @@ define([
 	types,
 	ListObj,
 	ScriptObj,
-	ExprObj
+	ExprObj,
+	IntObj,
+	StringObj
 ){
 "use strict";
 
@@ -56,11 +60,19 @@ return function(/* extensions... */){
 	this.commands = {};
 	this.extensions = {};
 
+	this.str_return_codes = {
+		'ok':		new IntObj(types.OK),
+		'error':	new IntObj(types.ERROR),
+		'return':	new IntObj(types.RETURN),
+		'break':	new IntObj(types.BREAK),
+		'continue':	new IntObj(types.CONTINUE)
+	};
+
 	this.resolve_var = function(varname) {
 		var vinfo = this.vars[varname];
 		if (vinfo === undefined) {
 			throw new TclError('can\'t read "'+varname+'": no such variable',
-				'TCL', 'LOOKUP', 'VARNAME', varname);
+			['TCL', 'LOOKUP', 'VARNAME', varname]);
 		}
 		return vinfo;
 	};
@@ -83,7 +95,7 @@ return function(/* extensions... */){
 		var vinfo = this.resolve_var(varname), obj;
 		if (vinfo.type === ARRAY) {
 			throw new TclError('can\'t read "'+varname+'": variable is array',
-				'TCL', 'READ', 'VARNAME');
+				['TCL', 'READ', 'VARNAME']);
 		}
 		obj = vinfo.value;
 		if (make_unshared && obj.refcount > 1) {
@@ -98,12 +110,12 @@ return function(/* extensions... */){
 		var vinfo = this.resolve_var(array), obj;
 		if (vinfo.type !== ARRAY) {
 			throw new TclError('can\'t read "'+array+'('+index+')": variable isn\'t array',
-				'TCL', 'LOOKUP', 'VARNAME', array);
+				['TCL', 'LOOKUP', 'VARNAME', array]);
 		}
 		if (index !== undefined) {
 			if (vinfo.value[index] === undefined) {
 				throw new TclError('can\'t read "'+array+'('+index+')": no such element in array',
-					'TCL', 'READ', 'VARNAME');
+					['TCL', 'READ', 'VARNAME']);
 			}
 			obj = vinfo.value[index];
 			if (make_unshared && obj.refcount > 1) {
@@ -123,7 +135,7 @@ return function(/* extensions... */){
 		}
 		if (vinfo.type === ARRAY) {
 			throw new TclError('can\'t set "'+varname+'": variable is array',
-				'TCL', 'WRITE', 'VARNAME');
+				['TCL', 'WRITE', 'VARNAME']);
 		}
 		if (vinfo.value !== undefined) {
 			vinfo.value.DecrRefCount();
@@ -140,7 +152,7 @@ return function(/* extensions... */){
 		}
 		if (vinfo.type !== ARRAY) {
 			throw new TclError('can\'t set "'+array+'('+index+')": variable isn\'t array',
-				'TCL', 'LOOKUP', 'VARNAME', array);
+				['TCL', 'LOOKUP', 'VARNAME', array]);
 		}
 		if (index) {
 			if (vinfo.value[index] !== undefined) {
@@ -224,7 +236,7 @@ return function(/* extensions... */){
 		}
 		if (args.length-1 < min || args.length-1 > max) {
 			throw new TclError('wrong # args: should be "'+args[0]+' '+msg+'"',
-				'TCL', 'WRONGARGS');
+				['TCL', 'WRONGARGS']);
 		}
 	};
 
@@ -239,7 +251,7 @@ return function(/* extensions... */){
 					return c_ok([]);
 				}
 				if (parts.length > 1) {
-					res = tclobj.NewString(parts.join(''));
+					res = new StringObj(parts.join(''));
 				} else {
 					res = parts[0];
 				}
@@ -252,7 +264,7 @@ return function(/* extensions... */){
 					break;
 
 				case parser.TXT:
-					parts.push(tclobj.NewString(token[1]));
+					parts.push(new StringObj(token[1]));
 					break;
 
 				case parser.VAR:
@@ -330,7 +342,7 @@ return function(/* extensions... */){
 				if (result instanceof TclError) {
 					result = result.toTclResult();
 				} else if (result instanceof Error) {
-					result = new TclResult(ERROR, tclobj.NewString(result));
+					result = new TclResult(ERROR, new StringObj(result));
 				} else {
 					result = new TclResult(OK, result);
 				}
@@ -440,10 +452,10 @@ return function(/* extensions... */){
 				}
 				if (func_handler.args) {
 					if (args.length < func_handler.args[0]) {
-						throw new TclError('too few arguments to math function "'+funcname+'"', 'TCL', 'WRONGARGS');
+						throw new TclError('too few arguments to math function "'+funcname+'"', ['TCL', 'WRONGARGS']);
 					}
 					if (func_handler.args[1] !== null && args.length > func_handler.args[1]) {
-						throw new TclError('too many arguments to math function "'+funcname+'"', 'TCL', 'WRONGARGS');
+						throw new TclError('too many arguments to math function "'+funcname+'"', ['TCL', 'WRONGARGS']);
 					}
 				}
 				return c(func_handler.handler(args, self, func_handler.priv));

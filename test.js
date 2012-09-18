@@ -75,10 +75,7 @@ require([
 		}, 'output');
 		interp.registerCommand('puts', function(args){
 			var message;
-			if (args.length < 2 || args.length > 3) {
-				throw new interp.TclError('wrong # args: should be "puts ?-nonewline? string"',
-					'TCL', 'WRONGARGS');
-			}
+			interp.checkArgs(args, [1, 2], "?-nonewline? string");
 			if (args.length === 2) {
 				message = args[1] + '\n';
 			} else {
@@ -87,31 +84,19 @@ require([
 			domConstruct.create('span', {innerHTML: message}, outputnode);
 		});
 		interp.registerCommand('getstring', function(args, interp){
-			if (args.length !== 1) {
-				throw new interp.TclError('wrong # args: should be "'+args[0]+'"',
-					'TCL', 'WRONGARGS');
-			}
+			interp.checkArgs(args, 0, '');
 			return 'result of getstring';
 		});
 		interp.registerCommand('get string', function(args, interp){
-			if (args.length !== 1) {
-				throw new interp.TclError('wrong # args: should be "'+args[0]+'"',
-					'TCL', 'WRONGARGS');
-			}
+			interp.checkArgs(args, 0, '');
 			return 'result of get string';
 		});
 		interp.registerCommand('say_o', function(args, interp){
-			if (args.length !== 1) {
-				throw new interp.TclError('wrong # args: should be "'+args[0]+'"',
-					'TCL', 'WRONGARGS');
-			}
+			interp.checkArgs(args, 0, '');
 			return 'o';
 		});
 		interp.registerAsyncCommand('bar', function(c, args, interp){
-			if (args.length !== 1) {
-				throw new interp.TclError('wrong # args: should be "'+args[0]+'"',
-					'TCL', 'WRONGARGS');
-			}
+			interp.checkArgs(args, 0, '');
 			setTimeout(function(){
 				c('delayed result');
 			}, 2000);

@@ -69,6 +69,8 @@ function install(interp) {
 		for (i=1; i<args.length; i++) {
 			lists.push(args[i].GetList());
 		}
+		// TODO: this is not quite right - concat trims whitespace from its
+		// args before joining them with ' '
 		return new ListObj(Array.prototype.concat.apply([], lists));
 	});
 

@@ -175,6 +175,27 @@ return function(/* extensions... */){
 		return [array, index];
 	};
 
+	this.unset_var = function(varname, report_errors) {
+		var parts, obj, vinfo;
+		varname = tclobj.AsVal(varname);
+		if (varname[varname.length-1] === ')') {
+			parts = this._parse_varname(varname);
+			vinfo = this.vars[parts[0]];
+			if (report_errors && vinfo === undefined || vinfo[parts[1]]) {
+				throw new TclError('can\'t unset "'+varname+'": no such variable', ['TCL', 'LOOKUP', 'VARNAME']);
+			}
+
+			delete vinfo[parts[1]];
+			return;
+		}
+		this.vars[varname];
+		if (report_errors && this.vars[varname] === undefined) {
+			throw new TclError('can\'t unset "'+varname+'": no such variable', ['TCL', 'LOOKUP', 'VARNAME']);
+		}
+		delete this.vars[varname]
+		return;
+	},
+
 	this.get_var = function(varname, make_unshared) {
 		var parts, obj;
 		varname = tclobj.AsVal(varname);

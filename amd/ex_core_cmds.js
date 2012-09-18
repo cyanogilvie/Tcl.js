@@ -7,14 +7,16 @@ define([
 	'./ex_dict_cmds',
 	'./ex_string_cmds',
 	'./types',
-
+	'./utils',
 	'./objtype_int'
 ], function(
 	ex_control_cmds,
 	ex_list_cmds,
 	ex_dict_cmds,
 	ex_string_cmds,
-	types
+	types,
+	utils,
+	IntObj
 ){
 'use strict';
 
@@ -24,10 +26,9 @@ function install(interp) {
 	if (interp.register_extension('ex_core_cmds')) {return;}
 
 	/* Core commands still to implement:
-	 subst time eval proc variable catch clock info array
-	 coroutine global update append format package namespace binary scan apply
-	 trace zlib after vwait uplevel rename regexp upvar tailcall
-	 unset regsub interp yield
+	 after append apply array binary clock coroutine format global info interp
+	 namespace package proc regexp regsub rename scan subst tailcall time trace
+	 update uplevel upvar variable vwait yield zlib
 	 */
 
 	interp.registerCommand('set', function(args){
@@ -36,6 +37,33 @@ function install(interp) {
 			return interp.get_var(args[1]);
 		}
 		return interp.set_var(args[1], args[2]);
+	});
+
+	interp.registerCommand('unset', function(args){
+		var eating_args = true, report_errors = true, i;
+		while (eating_args && args.length > 0) {
+			switch (args[0].toString()) {
+				case '-nocomplain': report_errors = false; args.shift(); break;
+				case '--': eating_args = false; args.shift(); break;
+			}
+		}
+		for (i=0; i<args.length; i++) {
+			interp.unset_var(args[i], report_errors);
+		}
+	});
+
+	interp.registerAsyncCommand('catch', function(c, args){
+		interp.checkArgs(args, [1, 3], 'script ?resultVarName? ?optionsVarName?');
+		var resultvar = args[2], optionsvar = args[3];
+		return interp.exec(args[1], function(res){
+			if (resultvar !== undefined) {
+				interp.set_var(resultvar, res.result);
+			}
+			if (optionsvar !== undefined) {
+				interp.set_var(optionsvar, res.options);
+			}
+			return new IntObj(res.code);
+		});
 	});
 
 	interp.registerCommand('expr', function(args){
@@ -83,6 +111,14 @@ function install(interp) {
 			options['-level'] = types.IntOne;
 		}
 		return new TclResult(options['-code'].GetInt(), value, options);
+	});
+
+	interp.registerAsyncCommand('eval', function(c, args){
+		var script, parts = [], i;
+		for (i=1; i<args.length; i++) {
+			parts.push(/^[ \t\n\r]*(.*?)[ \t\n\r]*$/.exec(args[i].toString())[1]);
+		}
+		return interp.exec(parts.join(' '), c);
 	});
 
 	ex_control_cmds.install(interp);

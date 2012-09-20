@@ -52,9 +52,13 @@ function asTclError(e) {
 	return e instanceof TclError ? e : new TclError(e);
 }
 
+function trampoline(res) {
+	while (typeof res === "function") {res = res();}
+}
+
 return function(/* extensions... */){
 	var args = Array.prototype.slice.call(arguments),
-		self = this, mathops, mathfuncs, mathop_cache = [null, {}, {}];
+		I = this, mathops, mathfuncs, mathop_cache = [null, {}, {}];
 
 	this.vars = {};
 	this.commands = {};
@@ -164,7 +168,7 @@ return function(/* extensions... */){
 		return value;
 	};
 
-	this._parse_varname = function(varname) {
+	function parse_varname(varname) {
 		var array, index, idx;
 
 		// TODO: properly
@@ -173,34 +177,33 @@ return function(/* extensions... */){
 		index = varname.substr(idx+1, varname.length-idx-2);
 
 		return [array, index];
-	};
+	}
 
 	this.unset_var = function(varname, report_errors) {
-		var parts, obj, vinfo;
+		var parts, vinfo;
 		varname = tclobj.AsVal(varname);
 		if (varname[varname.length-1] === ')') {
-			parts = this._parse_varname(varname);
+			parts = parse_varname(varname);
 			vinfo = this.vars[parts[0]];
-			if (report_errors && vinfo === undefined || vinfo[parts[1]]) {
+			if (report_errors && (vinfo === undefined || vinfo[parts[1]] === undefined)) {
 				throw new TclError('can\'t unset "'+varname+'": no such variable', ['TCL', 'LOOKUP', 'VARNAME']);
 			}
 
 			delete vinfo[parts[1]];
 			return;
 		}
-		this.vars[varname];
 		if (report_errors && this.vars[varname] === undefined) {
 			throw new TclError('can\'t unset "'+varname+'": no such variable', ['TCL', 'LOOKUP', 'VARNAME']);
 		}
-		delete this.vars[varname]
+		delete this.vars[varname];
 		return;
-	},
+	};
 
 	this.get_var = function(varname, make_unshared) {
 		var parts, obj;
 		varname = tclobj.AsVal(varname);
 		if (varname[varname.length-1] === ')') {
-			parts = this._parse_varname(varname);
+			parts = parse_varname(varname);
 			return this.get_array(parts[0], parts[1], make_unshared);
 		}
 		obj = this.get_scalar(varname, make_unshared);
@@ -211,7 +214,7 @@ return function(/* extensions... */){
 		var parts;
 		varname = tclobj.AsVal(varname);
 		if (varname[varname.length-1] === ')') {
-			parts = this._parse_varname(varname);
+			parts = parse_varname(varname);
 			return this.set_array(parts[0], parts[1], value);
 		}
 		return this.set_scalar(varname, value);
@@ -226,24 +229,24 @@ return function(/* extensions... */){
 		return cinfo;
 	};
 
-	this._registerCmd = function(async, commandname, handler, priv, onDelete) {
-		var cinfo = this.resolve_command(commandname, false);
+	function registerCmd(async, commandname, handler, priv, onDelete) {
+		var cinfo = I.resolve_command(commandname, false);
 		if (cinfo !== undefined && cinfo.onDelete) {
 			cinfo.onDelete(cinfo.priv);
 		} else {
-			cinfo = this.commands[commandname] = {
-			};
+			cinfo = I.commands[commandname] = {};
 		}
 		cinfo.handler = handler;
 		cinfo.async = async;
 		cinfo.priv = priv;
 		cinfo.onDelete = onDelete;
-	};
+	}
+
 	this.registerCommand = function(commandname, handler, priv, onDelete) {
-		return this._registerCmd(false, commandname, handler, priv, onDelete);
+		return registerCmd(false, commandname, handler, priv, onDelete);
 	};
 	this.registerAsyncCommand = function(commandname, handler, priv, onDelete) {
-		return this._registerCmd(true, commandname, handler, priv, onDelete);
+		return registerCmd(true, commandname, handler, priv, onDelete);
 	};
 
 	this.checkArgs = function(args, count, msg) {
@@ -261,8 +264,8 @@ return function(/* extensions... */){
 		}
 	};
 
-	this.resolve_word = function(tokens, c_ok, c_err) {
-		var parts=[], expand=false, array, self=this, i=0;
+	function resolve_word(tokens, c_ok, c_err) {
+		var parts=[], expand=false, array, i=0;
 
 		return function next_token(){
 			var res, index, token = tokens[i++];
@@ -289,7 +292,7 @@ return function(/* extensions... */){
 					break;
 
 				case parser.VAR:
-					parts.push(self.get_scalar(token[1]));
+					parts.push(I.get_scalar(token[1]));
 					break;
 
 				case parser.ARRAY:
@@ -297,9 +300,9 @@ return function(/* extensions... */){
 					break;
 
 				case parser.INDEX:
-					return self.resolve_word(token[1], function(indexwords){
+					return resolve_word(token[1], function(indexwords){
 						index = indexwords.join('');
-						parts.push(self.get_array(array, index));
+						parts.push(I.get_array(array, index));
 						array = null;
 						return next_token;
 					}, function(err){
@@ -310,7 +313,7 @@ return function(/* extensions... */){
 					if (!(token[1] instanceof ScriptObj)) {
 						token[1] = new ScriptObj(token);
 					}
-					return self.exec(token[1], function(result){
+					return I.exec(token[1], function(result){
 						if (result.code === OK) {
 							parts.push(result.result);
 							return next_token;
@@ -321,10 +324,10 @@ return function(/* extensions... */){
 
 			return next_token;
 		};
-	};
+	}
 
-	this.get_words = function(commandline, c_ok, c_err) {
-		var self = this, sofar = [], i = 0;
+	function get_words(commandline, c_ok, c_err) {
+		var sofar = [], i = 0;
 
 		return function next_word(){
 			var resolved, next = commandline[i++];
@@ -332,7 +335,7 @@ return function(/* extensions... */){
 			if (next === undefined) {
 				if (sofar.length === 0) {return c_ok(sofar);}
 				try {
-					resolved = self.resolve_command(sofar[0]);
+					resolved = I.resolve_command(sofar[0]);
 				} catch(e){
 					return c_err(e);
 				}
@@ -343,7 +346,7 @@ return function(/* extensions... */){
 				return c_ok(sofar);
 			}
 
-			return self.resolve_word(next, function(addwords){
+			return resolve_word(next, function(addwords){
 				var i;
 				for (i=0; i<addwords.length; i++) {
 					sofar.push(addwords[i]);
@@ -353,11 +356,9 @@ return function(/* extensions... */){
 				return c_err(err);
 			});
 		};
-	};
+	}
 
-	this.eval_command = function(commandline, c) {
-		var self=this;
-
+	function eval_command(commandline, c) {
 		function normalize_result(result) {
 			if (!(result instanceof TclResult)) {
 				if (result instanceof TclError) {
@@ -375,7 +376,7 @@ return function(/* extensions... */){
 			return c(normalize_result(result));
 		}
 
-		return this.get_words(commandline, function(words){
+		return get_words(commandline, function(words){
 			var i, result, args, command;
 			if (words.length === 0) {
 				return c(null);
@@ -393,13 +394,13 @@ return function(/* extensions... */){
 								// Support tailcalls
 								result = result();
 							}
-							self._trampoline(got_result(result));
+							trampoline(got_result(result));
 						} catch(e2){
 							return got_result(asTclError(e2));
 						}
-					}, args, self, command.priv);
+					}, args, I, command.priv);
 				}
-				result = command.cinfo.handler(args, self, command.priv);
+				result = command.cinfo.handler(args, I, command.priv);
 				while (typeof result === 'function') {
 					// Support tailcalls
 					result = result();
@@ -417,10 +418,10 @@ return function(/* extensions... */){
 			}
 			return c(err);
 		});
-	};
+	}
 
 	this.exec = function(script, c) {
-		var lastresult=new TclResult(OK), self=this,
+		var lastresult=new TclResult(OK),
 			parse = tclobj.AsObj(script).GetExecParse(),
 			commands = parse[1], i = 0;
 
@@ -430,7 +431,7 @@ return function(/* extensions... */){
 				return c(lastresult);
 			}
 
-			return self.eval_command(command, function(result){
+			return eval_command(command, function(result){
 				if (result !== null) {
 					if (result.code !== OK) {
 						return c(result);
@@ -442,15 +443,9 @@ return function(/* extensions... */){
 		};
 	};
 
-	this._trampoline = function(res) {
-		while (typeof res === "function") {
-			res = res();
-		}
-	};
-
 	this.TclEval = function(script, c) {
 		try {
-			this._trampoline(this.exec(script, c));
+			trampoline(this.exec(script, c));
 		} catch(e){
 			return c(asTclError(e).toTclResult());
 		}
@@ -479,11 +474,11 @@ return function(/* extensions... */){
 						throw new TclError('too many arguments to math function "'+funcname+'"', ['TCL', 'WRONGARGS']);
 					}
 				}
-				return c(func_handler.handler(args, self, func_handler.priv));
+				return c(func_handler.handler(args, I, func_handler.priv));
 			}
 			if (part[0] === ARG) {
 				if (part[1] === EXPR) {
-					return self._TclExpr(tclobj.NewExpr(part[2]),
+					return I._TclExpr(tclobj.NewExpr(part[2]),
 						function(res) {
 							args.push(res);
 							return next_part;
@@ -513,7 +508,7 @@ return function(/* extensions... */){
 				return c(operand[2]);
 			case BRACED:
 			case QUOTED:
-				return self.resolve_word(operand[2], function(chunks){
+				return resolve_word(operand[2], function(chunks){
 					if (chunks.length === 1) {
 						return c(chunks[0]);
 					}
@@ -523,15 +518,15 @@ return function(/* extensions... */){
 				});
 			case VAR:
 				if (operand[2].length === 1) {
-					return c(self.get_scalar(operand[2][0]));
+					return c(I.get_scalar(operand[2][0]));
 				}
 				if (typeof operand[2][1] === 'string') {
-					return c(self.get_array(operand[2][0], operand[2][1]));
+					return c(I.get_array(operand[2][0], operand[2][1]));
 				}
-				return self.resolve_word(operand[2][1], function(indexwords){
+				return resolve_word(operand[2][1], function(indexwords){
 					var index;
 					index = indexwords.join('');
-					return c(self.get_array(operand[2][0], index));
+					return c(I.get_array(operand[2][0], index));
 				}, function(err){
 					throw new Error('Error resolving array index: '+err);
 				});
@@ -539,7 +534,7 @@ return function(/* extensions... */){
 				if (operand[2] instanceof Array) {
 					operand[2] = new ScriptObj(operand[2]);
 				}
-				return self.exec(operand[2], function(res){
+				return I.exec(operand[2], function(res){
 					return c(res.result);
 				});
 			default:
@@ -721,7 +716,7 @@ return function(/* extensions... */){
 
 	this.TclExpr = function(expr, c) {
 		try {
-			this._trampoline(this._TclExpr(expr, c));
+			trampoline(this._TclExpr(expr, c));
 		} catch(e){
 			return c(asTclError(e).toTclResult());
 		}

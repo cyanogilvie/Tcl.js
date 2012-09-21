@@ -76,7 +76,7 @@ return function(/* extensions... */){
 		var vinfo = this.vars[varname];
 		if (vinfo === undefined) {
 			throw new TclError('can\'t read "'+varname+'": no such variable',
-			['TCL', 'LOOKUP', 'VARNAME', varname]);
+				['TCL', 'LOOKUP', 'VARNAME', varname]);
 		}
 		return vinfo;
 	};
@@ -267,94 +267,93 @@ return function(/* extensions... */){
 	function resolve_word(tokens, c_ok, c_err) {
 		var parts=[], expand=false, array, i=0;
 
-		return function next_token(){
-			var res, index, token = tokens[i++];
+		return function next_tokens(){
+			var res, index, token;
 
-			if (token === undefined) {
-				if (parts.length === 0) {
-					return c_ok([]);
-				}
-				if (parts.length > 1) {
-					res = new StringObj(parts.join(''));
-				} else {
-					res = parts[0];
-				}
-				return c_ok(expand ? tclobj.GetList(res) : [res]);
-			}
+			while (i < tokens.length) {
+				token = tokens[i++];
+				switch (token[0]) {
+					case parser.EXPAND:
+						expand = true;
+						break;
 
-			switch (token[0]) {
-				case parser.EXPAND:
-					expand = true;
-					break;
+					case parser.TXT:
+						parts.push(new StringObj(token[1]));
+						break;
 
-				case parser.TXT:
-					parts.push(new StringObj(token[1]));
-					break;
+					case parser.VAR:
+						parts.push(I.get_scalar(token[1]));
+						break;
 
-				case parser.VAR:
-					parts.push(I.get_scalar(token[1]));
-					break;
+					case parser.ARRAY:
+						array = token[1];
+						break;
 
-				case parser.ARRAY:
-					array = token[1];
-					break;
+					case parser.INDEX:
+						return resolve_word(token[1], function(indexwords){
+							index = indexwords.join('');
+							parts.push(I.get_array(array, index));
+							array = null;
+							return next_tokens;
+						}, function(err){
+							return c_err(err);
+						});
 
-				case parser.INDEX:
-					return resolve_word(token[1], function(indexwords){
-						index = indexwords.join('');
-						parts.push(I.get_array(array, index));
-						array = null;
-						return next_token;
-					}, function(err){
-						return c_err(err);
-					});
-
-				case parser.SCRIPT:
-					if (!(token[1] instanceof ScriptObj)) {
-						token[1] = new ScriptObj(token);
-					}
-					return I.exec(token[1], function(result){
-						if (result.code === OK) {
-							parts.push(result.result);
-							return next_token;
+					case parser.SCRIPT:
+						if (!(token[1] instanceof ScriptObj)) {
+							token[1] = new ScriptObj(token);
 						}
-						return c_err(result);
-					});
+						return I.exec(token[1], function(result){
+							if (result.code === OK) {
+								parts.push(result.result);
+								return next_tokens;
+							}
+							return c_err(result);
+						});
+				}
 			}
 
-			return next_token;
+			if (parts.length === 0) {
+				return c_ok([]);
+			}
+			if (parts.length > 1) {
+				res = new StringObj(parts.join(''));
+			} else {
+				res = parts[0];
+			}
+			return c_ok(expand ? tclobj.GetList(res) : [res]);
 		};
 	}
 
 	function get_words(commandline, c_ok, c_err) {
 		var sofar = [], i = 0;
 
-		return function next_word(){
-			var resolved, next = commandline[i++];
+		return function next_words(){
+			var resolved;
 
-			if (next === undefined) {
-				if (sofar.length === 0) {return c_ok(sofar);}
-				try {
-					resolved = I.resolve_command(sofar[0]);
-				} catch(e){
-					return c_err(e);
-				}
-				sofar[0] = {
-					text: sofar[0],
-					cinfo: resolved
-				};
-				return c_ok(sofar);
+			while (i < commandline.length) {
+				return resolve_word(commandline[i++], function(addwords){
+					var i;
+					for (i=0; i<addwords.length; i++) {
+						sofar.push(addwords[i]);
+					}
+					return next_words;
+				}, function(err){
+					return c_err(err);
+				});
 			}
 
-			return resolve_word(next, function(addwords){
-				var i;
-				for (i=0; i<addwords.length; i++) {
-					sofar.push(addwords[i]);
-				}
-				return next_word;
-			}, function(err){
-				return c_err(err);
-			});
+			if (sofar.length === 0) {return c_ok(sofar);}
+			try {
+				resolved = I.resolve_command(sofar[0]);
+			} catch(e){
+				return c_err(e);
+			}
+			sofar[0] = {
+				text: sofar[0],
+				cinfo: resolved
+			};
+			return c_ok(sofar);
 		};
 	}
 
@@ -426,25 +425,23 @@ return function(/* extensions... */){
 	}
 
 	this.exec = function(script, c) {
-		var lastresult=new TclResult(OK),
+		var lastresult = new TclResult(OK),
 			parse = tclobj.AsObj(script).GetExecParse(),
 			commands = parse[1], i = 0;
 
-		return function next_command(){
-			var command = commands[i++];
-			if (command === undefined) {
-				return c(lastresult);
-			}
-
-			return eval_command(command, function(result){
-				if (result !== null) {
-					if (result.code !== OK) {
-						return c(result);
+		return function next_commands(){
+			while (i<commands.length) {
+				return eval_command(commands[i++], function(result){
+					if (result !== null) {
+						if (result.code !== OK) {
+							return c(result);
+						}
+						lastresult = result;
 					}
-					lastresult = result;
-				}
-				return next_command;
-			});
+					return next_commands;
+				});
+			}
+			return c(lastresult);
 		};
 	};
 

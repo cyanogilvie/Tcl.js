@@ -30,6 +30,34 @@ var TclError = types.TclError, utils = {
 		return res;
 	},
 
+	to_number: function(value) {
+		var str = String(value), m;
+		if (m = /^(?:([\-+]?)(Inf(?:inity)?)|(NaN))\b/i.exec(str)) {
+			if (/n/i.test(m[0][1])) {
+				return NaN;
+			} else {
+				return Number(m[1]+'Infinity');
+			}
+		}
+		if (m = (
+			/^[\-+]?\d+(?:(\.)(?:\d+)?)?(e[\-+]?\d+)?/i.exec(str) ||
+			/^[\-+]?(\.)\d+(e[\-+]?\d+)?/i.exec(str)
+		)) {
+			return Number(m[0]);
+		}
+		if (m = (
+			/^([\-+])?(0x)([\dA-F]+)/i.exec(str) ||
+			/^([\-+])?(0b)([01]+)/i.exec(str) ||
+			/^([\-+])?(0o)([0-7]+)/i.exec(str)
+		)) {
+			// TODO: Bignum support
+			return parseInt((m[1] || '')+m[3],
+				{'': 10, '0x': 16, '0b': 2, '0o': 8}[m[2]]
+			);
+		}
+		return NaN;
+	},
+
 	to_int: function(value) {
 		var m, str;
 		if (typeof value === "number") {
@@ -42,7 +70,7 @@ var TclError = types.TclError, utils = {
 		str = String(value);
 		if (m = (
 			/^([\+\-])?(0)(\d+)$/i.exec(str) ||
-			/^([\+\-])?()(\d+)e([\-+]?\d+)?$/i.exec(str) ||
+			/^([\+\-])?()(\d+)(?:e([\-+]?\d+))?$/i.exec(str) ||
 			/^([\+\-])?(0x)([\dA-F]+)$/i.exec(str) ||
 			/^([\+\-])?(0b)([01]+)$/i.exec(str) ||
 			/^([\+\-])?(0o)([0-7]+)$/i.exec(str)

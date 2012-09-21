@@ -125,7 +125,7 @@ iface = {
 	'RegisterObjType': RegisterObjType,
 	'NewObj': NewObj,
 	'AsObj': function(value){return value instanceof TclObject ? value : NewObj('auto', value);},
-	'AsVal': function(value){return value instanceof TclObject ? value.GetJsVal() : value;}
+	'AsVal': function(value){return value instanceof TclObject ? value.valueOf() : value;}
 };
 
 return iface;

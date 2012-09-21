@@ -1,7 +1,13 @@
 /*global define */
 /*jslint nomen: true, plusplus: true, white: true, browser: true, node: true, newcap: true, continue: true */
 
-define(['./types'], function(types){
+define([
+	'./types',
+	'./utils'
+], function(
+	types,
+	utils
+){
 "use strict";
 
 var problem_chars = /[ "{}$;\t\f\n\r\v\[\]]/,
@@ -565,7 +571,10 @@ function complete(str) { //<<<
 
 //>>>
 function bool(str) { //<<<
-	var normstr = str.toLowerCase(), i;
+	var normstr = str.toLowerCase(), i, asnum = utils.to_number(normstr);
+	if (!isNaN(asnum)) {
+		return asnum !== 0;
+	}
 
 	if (normstr === 'o') {throw new Error('Invalid boolean value "'+str+'"');}
 	for (i=0; i<true_values.length; i++) {

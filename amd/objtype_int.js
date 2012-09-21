@@ -25,7 +25,6 @@ var inthandlers = {
 	},
 	setFromAny: function(obj){
 		var newjsval = utils.to_int(obj);
-		obj.handlers.updateString(obj);
 		obj.FreeJsVal();
 		obj.jsval = newjsval;
 	}

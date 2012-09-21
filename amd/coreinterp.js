@@ -102,7 +102,7 @@ return function(/* extensions... */){
 				['TCL', 'READ', 'VARNAME']);
 		}
 		obj = vinfo.value;
-		if (make_unshared && obj.refcount > 1) {
+		if (make_unshared && obj.refCount > 1) {
 			obj = obj.DuplicateObj();
 			vinfo.value = obj;
 			obj.IncrRefCount();
@@ -122,7 +122,7 @@ return function(/* extensions... */){
 					['TCL', 'READ', 'VARNAME']);
 			}
 			obj = vinfo.value[index];
-			if (make_unshared && obj.refcount > 1) {
+			if (make_unshared && obj.refCount > 1) {
 				obj = obj.DuplicateObj();
 				vinfo.value[index] = obj;
 				obj.IncrRefCount();
@@ -377,7 +377,7 @@ return function(/* extensions... */){
 		}
 
 		return get_words(commandline, function(words){
-			var i, result, args, command;
+			var i, result, args, command, needs_trampoline = false, asyncres;
 			if (words.length === 0) {
 				return c(null);
 			}
@@ -388,17 +388,22 @@ return function(/* extensions... */){
 			}
 			try {
 				if (command.cinfo.async) {
-					return command.cinfo.handler(function(result){
+					asyncres = command.cinfo.handler(function(result){
 						try {
 							while (typeof result === 'function') {
 								// Support tailcalls
 								result = result();
 							}
-							trampoline(got_result(result));
+							if (!needs_trampoline) {
+								return got_result(result);
+							}
+							return trampoline(got_result(result));
 						} catch(e2){
 							return got_result(asTclError(e2));
 						}
 					}, args, I, command.priv);
+					needs_trampoline = true;
+					return asyncres;
 				}
 				result = command.cinfo.handler(args, I, command.priv);
 				while (typeof result === 'function') {
@@ -723,11 +728,10 @@ return function(/* extensions... */){
 	};
 
 	this._TclExpr = function(expr, c) {
-		var P = tclobj.AsObj(expr).GetExprStack(), i=0, args, j, res,
-			stack = [];
+		var P = tclobj.AsObj(expr).GetExprStack(), i=0, stack = [];
 		// Algorithm from Harry Hutchins http://faculty.cs.niu.edu/~hutchins/csci241/eval.htm
 		return function next_P(){
-			var thisP = P[i++];
+			var thisP = P[i++], res, j, args;
 			if (thisP === undefined) {
 				res = stack.pop();
 				if (stack.length) {

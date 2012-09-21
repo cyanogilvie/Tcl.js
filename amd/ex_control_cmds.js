@@ -143,7 +143,7 @@ function install(interp){
 	});
 
 	interp.registerAsyncCommand('if', function(c, args, interp){
-		interp.checkArgs(args, [3, null], 'expression script ?args ...?');
+		interp.checkArgs(args, [2, null], 'expression script ?args ...?');
 		var i = 1;
 
 		return function next(){
@@ -154,7 +154,7 @@ function install(interp){
 					return interp.exec(args[i], c);
 				}
 				i++; // skip then body
-				switch (args[i++].toString()) {
+				switch (args[i++]) {
 					case undefined:	return c('');
 					case 'elseif':	return next;
 					case 'else':	return interp.exec(args[i], c);
@@ -278,8 +278,8 @@ function install(interp){
 				return interp._TclExpr(test, function(res){
 					if (res.code !== types.OK) {return c(res);}
 					if (!(res.result.GetBool())) {return c();}
-					interp.exec(body, function(res){
-						switch (res) {
+					return interp.exec(body, function(res){
+						switch (res.code) {
 							case types.CONTINUE:
 							case types.OK:
 								return interp.exec(next, function(res){

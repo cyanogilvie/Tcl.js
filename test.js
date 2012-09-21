@@ -183,4 +183,10 @@ require([
 	query('#cs1').on('click', function(){
 		run('if {[getstring] eq "result of getstring"} {puts "then body"} else {puts "else body"}');
 	});
+	query('#cs2').on('click', function(){
+		run('set acc 0; for {set i 0} {$i < 100} {incr i} {puts "loop body: $i"; if {$i % 2 == 0} continue; if {$i > 9} break; incr acc $i}; puts $acc');
+	});
+	query('#cs3').on('click', function(){
+		run('set acc 0; set i 10; puts "i before: $i"; while {[incr i -1]} {puts "loop i: $i"; incr acc $i}; puts $acc');
+	});
 });

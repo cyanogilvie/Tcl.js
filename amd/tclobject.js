@@ -52,7 +52,7 @@ TclObjectBase = {
 		if (this.jsval === null) {
 			this.handlers.updateJsVal(this);
 		}
-		return NewObj([this.type], this.handlers.dupJsVal(this));
+		return NewObj([this.handlers.type], this.handlers.dupJsVal(this));
 	},
 	IsShared: function(){
 		return this.refCount > 1;

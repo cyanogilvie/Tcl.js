@@ -23,12 +23,14 @@ function TclResult(code, result, options) {
 		result = types.EmptyString;
 	}
 	this.result = tclobj.AsObj(result);
-	this.options = options || {};
-	this.options['-code'] = code;
-	this.toString = function(){
-		return this.result.toString();
-	};
+	this.options = options || [];
+	this.options.push('-code', code);
 }
+TclResult.prototype = {
+	toString: function(){
+		return this.result.toString();
+	}
+};
 
 function TclError(message, errorcode, errorinfo) {
 	this.name = 'TclError';
@@ -36,9 +38,9 @@ function TclError(message, errorcode, errorinfo) {
 	this.errorinfo = errorinfo;
 	this.message = message;
 	this.toTclResult = function(){
-		return new TclResult(types.ERROR, String(message), {
-			errorcode: this.errorcode
-		});
+		return new TclResult(types.ERROR, String(message), [
+			'-errorcode', this.errorcode
+		]);
 	};
 }
 TclError.prototype = new Error();

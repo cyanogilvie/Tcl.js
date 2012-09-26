@@ -38,50 +38,6 @@ function commands2string(commands) {
 	return out;
 }
 
-function strip_for_exec(commands) {
-	var i, j, word, command = [], out = [];
-
-	function strip_word_for_exec(tokens) {
-		var i, token, word = [];
-		for (i=0; i<tokens.length; i++) {
-			token = tokens[i];
-			switch (token[0]) {
-				case parser.SCRIPT:
-					word.push([token[0], strip_for_exec(token[1])]);
-					break;
-
-				case parser.INDEX:
-					word.push([token[0], strip_word_for_exec(token[1])]);
-					break;
-
-				case parser.EXPAND:
-				case parser.TXT:
-				case parser.VAR:
-				case parser.ARRAY:
-					word.push([token[0], token[1]]);
-					break;
-
-				default:
-					//console.log('stripping token: ', token.slice());
-					break;
-			}
-		}
-		return word;
-	}
-
-	for (i=0; i<commands.length; i++) {
-		command = [];
-		for (j=0; j<commands[i].length; j++) {
-			word = strip_word_for_exec(commands[i][j]);
-			if (word.length > 0) {
-				command.push(word);
-			}
-		}
-		out.push(command);
-	}
-	return out;
-}
-
 function jsval_from_string(str) {
 	return {
 		commands: parser.parse_script(str)
@@ -130,12 +86,12 @@ types.TclObjectBase.GetParsedScript = function(){
 	}
 	return this.jsval.commands;
 };
-types.TclObjectBase.GetExecParse = function(){
+types.TclObjectBase.GetExecParse = function(I){
 	if (this.handlers !== script_handlers) {
 		this.ConvertToType('script');
 	}
 	if (this.jsval.exec_commands === undefined) {
-		this.jsval.exec_commands = [parser.SCRIPT, strip_for_exec(this.jsval.commands[1])];
+		this.jsval.exec_commands = I.compile_script(this.jsval.commands[1]);
 	}
 	return this.jsval.exec_commands;
 };

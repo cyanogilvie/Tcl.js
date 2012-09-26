@@ -1,4 +1,4 @@
-/*jslint plusplus: true, white: true, nomen: true */
+/*jslint plusplus: true, white: true, nomen: true, regexp: true */
 /*global define */
 
 define([
@@ -7,7 +7,6 @@ define([
 	'./ex_dict_cmds',
 	'./ex_string_cmds',
 	'./types',
-	'./utils',
 	'./objtype_int'
 ], function(
 	ex_control_cmds,
@@ -15,7 +14,6 @@ define([
 	ex_dict_cmds,
 	ex_string_cmds,
 	types,
-	utils,
 	IntObj
 ){
 'use strict';
@@ -62,7 +60,7 @@ function install(interp) {
 			if (optionsvar !== undefined) {
 				interp.set_var(optionsvar, res.options);
 			}
-			return new IntObj(res.code);
+			return c(new IntObj(res.code));
 		});
 	});
 
@@ -89,8 +87,7 @@ function install(interp) {
 
 	interp.registerCommand('return', function(args){
 		interp.checkArgs(args, [0, null], '?value?');
-		var pairs = args.slice(0, args.length-1), i, k, v, options = {},
-			code = types.RETURN, value;
+		var i, k, v, options = [], code = types.RETURN, value, level;
 
 		if (args.length % 2 === 1) {
 			value = args.pop();
@@ -99,22 +96,25 @@ function install(interp) {
 		}
 		while (i<args.length) {
 			k = args[i++]; v = args[i++];
-			options[k] = v;
+			options.push(k, v);
+			if (k === '-code') {
+				if (interp.str_return_codes[v] !== undefined) {
+					code = interp.str_return_codes[v];
+				} else {
+					code = v;
+				}
+			} else if (k === '-level') {
+				level = v;
+			}
 		}
-		if (options['-code'] === undefined) {
-			options['-code'] = interp.str_return_codes['return'];
+		if (level === undefined) {
+			options.push('-level', types.IntOne);
 		}
-		if (interp.str_return_codes[options['-code']] !== undefined) {
-			options['-code'] = interp.str_return_codes[options['-code']];
-		}
-		if (options['-level'] === undefined) {
-			options['-level'] = types.IntOne;
-		}
-		return new TclResult(options['-code'].GetInt(), value, options);
+		return new TclResult(options.code.GetInt(), value, options);
 	});
 
 	interp.registerAsyncCommand('eval', function(c, args){
-		var script, parts = [], i;
+		var parts = [], i;
 		for (i=1; i<args.length; i++) {
 			parts.push(/^[ \t\n\r]*(.*?)[ \t\n\r]*$/.exec(args[i].toString())[1]);
 		}

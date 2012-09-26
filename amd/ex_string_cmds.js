@@ -194,8 +194,14 @@ subcmds = {
 			};
 			mapping = args[1].GetList();
 			patterns = [];
+			i = 0;
 			while (i<mapping.length) {
-				k = mapping[i++]; v = mapping[i++];
+				if (ignorecase) {
+					k = mapping[i++].toString().toLowerCase();
+				} else {
+					k = mapping[i++].toString();
+				}
+				v = mapping[i++].toString();
 				patterns.push(utils.escape_regex(k));
 				cache.map[k] = v;
 			}
@@ -204,7 +210,12 @@ subcmds = {
 			cache = args[1].cache.string_map;
 		}
 		if (cache.re === undefined || cache.re.ignoreCase !== ignorecase) {
-			cache.re = new RegExp(cache.base_regex, 'g' + ignorecase ? 'i':'');
+			cache.re = new RegExp(cache.base_regex, 'g' + (ignorecase ? 'i':''));
+		}
+		if (ignorecase) {
+			return new StringObj(str.replace(cache.re, function(match){
+				return cache.map[match.toLowerCase()];
+			}));
 		}
 		return new StringObj(str.replace(cache.re, function(match){
 			return cache.map[match];
@@ -214,10 +225,14 @@ subcmds = {
 		var re, chars;
 		I.checkArgs(args, [1, 2], 'string ?chars?');
 		if (args[2] === undefined) {
-			re = /^[ \t\n\r]*(.*?)[ \t\n\r]*$/;
+			re = /^[ \t\n\r]*((?:.|\n)*?)[ \t\n\r]*$/;
 		} else {
-			chars = '[' + utils.escape_regex(args[2].toString()) + ']*';
-			re = new RegExp('^'+chars+'(.*?)'+chars+'$');
+			if (args[2].cache.trim_re === undefined) {
+				chars = '[' + utils.escape_regex(args[2].toString()) + ']*';
+				re = args[2].cache.trim_re = new RegExp('^'+chars+'((?:.|\n)*?)'+chars+'$');
+			} else {
+				re = args[2].cache.trim_re;
+			}
 		}
 		return re.exec(args[1].toString())[1];
 	},
@@ -225,10 +240,14 @@ subcmds = {
 		var re, chars;
 		I.checkArgs(args, [1, 2], 'string ?chars?');
 		if (args[2] === undefined) {
-			re = /^[ \t\n\r]*(.*)$/;
+			re = /^[ \t\n\r]*((?:.|\n)*)$/;
 		} else {
-			chars = '[' + utils.escape_regex(args[2].toString()) + ']*';
-			re = new RegExp('^'+chars+'(.*)$');
+			if (args[2].cache.trim_re === undefined) {
+				chars = '[' + utils.escape_regex(args[2].toString()) + ']*';
+				re = args[2].cache.trim_re = new RegExp('^'+chars+'((?:.|\n)*)$');
+			} else {
+				re = args[2].cache.trim_re;
+			}
 		}
 		return re.exec(args[1].toString())[1];
 	},
@@ -236,10 +255,14 @@ subcmds = {
 		var re, chars;
 		I.checkArgs(args, [1, 2], 'string ?chars?');
 		if (args[2] === undefined) {
-			re = /^(.*?)[ \t\n\r]*$/;
+			re = /^((?:.|\n)*?)[ \t\n\r]*$/;
 		} else {
-			chars = '[' + utils.escape_regex(args[2].toString()) + ']*';
-			re = new RegExp('^(.*?)'+chars+'$');
+			if (args[2].cache.trim_re === undefined) {
+				chars = '[' + utils.escape_regex(args[2].toString()) + ']*';
+				re = args[2].cache.trim_re = new RegExp('^((?:.|\n)*?)'+chars+'$');
+			} else {
+				re = args[2].cache.trim_re;
+			}
 		}
 		return re.exec(args[1].toString())[1];
 	},

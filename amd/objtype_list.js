@@ -32,12 +32,12 @@ listhandlers = {
 		} else {
 			switch (typeof obj.jsval) {
 				case 'string':
-					jsval = list.list2array(jsval);
+					jsval = list.list2array(obj.jsval);
 					break;
 				case 'function':
 				case 'object':
-					if (jsval instanceof String) {
-						jsval = list.list2array(jsval);
+					if (obj.jsval instanceof String) {
+						jsval = list.list2array(obj.jsval);
 					} else {
 						throw new Error('Cannot convert type to list');
 					}

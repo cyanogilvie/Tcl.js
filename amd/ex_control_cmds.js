@@ -29,12 +29,12 @@ function install(interp){
 
 	interp.registerCommand('continue', function(args){
 		interp.checkArgs(args, 0, '');
-		return new TclResult(types.CONTINUE, EmptyString, {'-level': 0});
+		return new TclResult(types.CONTINUE, EmptyString, ['-level', 0]);
 	});
 
 	interp.registerCommand('break', function(args){
 		interp.checkArgs(args, 0, '');
-		return new TclResult(types.BREAK, EmptyString, {'-level': 0});
+		return new TclResult(types.BREAK, EmptyString, ['-level', 0]);
 	});
 
 	interp.registerCommand('error', function(args){

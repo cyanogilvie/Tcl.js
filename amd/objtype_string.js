@@ -20,8 +20,9 @@ var stringhandlers = {
 		return obj.jsval;
 	},
 	setFromAny: function(obj){
+		var str = obj.toString();
 		obj.FreeJsVal();
-		obj.jsval = obj.toString();
+		obj.jsval = str;
 	}
 };
 

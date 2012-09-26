@@ -31,13 +31,13 @@ var TclError = types.TclError, utils = {
 	},
 
 	to_number: function(value) {
+		if (typeof value === "number") {return value;}
 		var str = String(value), m;
 		if (m = /^(?:([\-+]?)(Inf(?:inity)?)|(NaN))\b/i.exec(str)) {
 			if (/n/i.test(m[0][1])) {
 				return NaN;
-			} else {
-				return Number(m[1]+'Infinity');
 			}
+			return Number(m[1]+'Infinity');
 		}
 		if (m = (
 			/^[\-+]?\d+(?:(\.)(?:\d+)?)?(e[\-+]?\d+)?/i.exec(str) ||
@@ -103,10 +103,13 @@ var TclError = types.TclError, utils = {
 		} catch(ignore){}
 
 		idx = obj.GetString();
-		if (matches = /^(.*?)[+\-](.*)$/.exec(idx)) {
+		if (idx === 'end') {
+			return len;
+		}
+		if (matches = /^(.*?)([+\-])(.*)$/.exec(idx)) {
 			a = matches[1] === 'end' ? len : utils.to_int(matches[1]);
 			op = matches[2];
-			b = matches[3] === utils.to_int(matches[3]);
+			b = utils.to_int(matches[3]);
 			switch (op) {
 				case '+': return a + b;
 				case '-': return a - b;

@@ -1,4 +1,4 @@
-/*jslint plusplus: true, white: true, nomen: true, bitwise: true */
+/*jslint plusplus: true, white: true, nomen: true, bitwise: true, continue: true */
 /*global define */
 
 define([
@@ -46,7 +46,8 @@ var TclError = types.TclError,
 	VAR = parser.VAR,
 	INDEX = parser.INDEX,
 	ARG = parser.ARG,
-	EmptyString = types.EmptyString;
+	EmptyString = types.EmptyString,
+	EmptyResult = new TclResult(OK, '');
 
 function asTclError(e) {
 	return e instanceof TclError ? e : new TclError(e);
@@ -220,17 +221,20 @@ return function(/* extensions... */){
 		return this.set_scalar(varname, value);
 	};
 
-	this.resolve_command = function(commandname, failifmissing) {
-		var cinfo = this.commands[commandname];
-		failifmissing = failifmissing === undefined ? true : failifmissing;
-		if (cinfo === undefined && failifmissing) {
+	this.lookup_command = function(commandname) {
+		return this.commands[commandname];
+	};
+
+	this.resolve_command = function(commandname) {
+		var cinfo = this.lookup_command(commandname);
+		if (cinfo === undefined) {
 			throw new TclError('invalid command name "'+commandname+'"');
 		}
 		return cinfo;
 	};
 
 	function registerCmd(async, commandname, handler, priv, onDelete) {
-		var cinfo = I.resolve_command(commandname, false);
+		var cinfo = I.lookup_command(commandname);
 		if (cinfo !== undefined && cinfo.onDelete) {
 			cinfo.onDelete(cinfo.priv);
 		} else {
@@ -300,8 +304,8 @@ return function(/* extensions... */){
 						});
 
 					case parser.SCRIPT:
-						if (!(token[1] instanceof ScriptObj)) {
-							token[1] = new ScriptObj(token);
+						if (!(token[1] instanceof tclobj.TclObject)) {
+							token[1] = new ScriptObj([parser.SCRIPT, token[1].slice()]);
 						}
 						return I.exec(token[1], function(result){
 							if (result.code === OK) {
@@ -325,39 +329,10 @@ return function(/* extensions... */){
 		};
 	}
 
-	function get_words(commandline, c_ok, c_err) {
-		var sofar = [], i = 0;
+	function exec_command(args, c) {
+		var cinfo = I.resolve_command(args[0]),
+			result, needs_trampoline = false, asyncres;
 
-		return function next_words(){
-			var resolved;
-
-			while (i < commandline.length) {
-				return resolve_word(commandline[i++], function(addwords){
-					var i;
-					for (i=0; i<addwords.length; i++) {
-						sofar.push(addwords[i]);
-					}
-					return next_words;
-				}, function(err){
-					return c_err(err);
-				});
-			}
-
-			if (sofar.length === 0) {return c_ok(sofar);}
-			try {
-				resolved = I.resolve_command(sofar[0]);
-			} catch(e){
-				return c_err(e);
-			}
-			sofar[0] = {
-				text: sofar[0],
-				cinfo: resolved
-			};
-			return c_ok(sofar);
-		};
-	}
-
-	function eval_command(commandline, c) {
 		function normalize_result(result) {
 			if (!(result instanceof TclResult)) {
 				if (result instanceof TclError) {
@@ -375,74 +350,253 @@ return function(/* extensions... */){
 			return c(normalize_result(result));
 		}
 
-		return get_words(commandline, function(words){
-			var i, result, args, command, needs_trampoline = false, asyncres;
-			if (words.length === 0) {
-				return c(null);
-			}
-			command = words[0];
-			args = [command.text];
-			for (i=1; i<words.length; i++) {
-				args.push(words[i]);
-			}
-			try {
-				if (command.cinfo.async) {
-					asyncres = command.cinfo.handler(function(result){
-						try {
-							while (typeof result === 'function') {
-								// Support tailcalls
-								result = result();
-							}
-							if (!needs_trampoline) {
-								return got_result(result);
-							}
-							return trampoline(got_result(result));
-						} catch(e2){
-							return got_result(asTclError(e2));
+		try {
+			if (cinfo.async) {
+				asyncres = cinfo.handler(function(result){
+					try {
+						while (typeof result === 'function') {
+							// Support tailcalls
+							result = result();
 						}
-					}, args, I, command.priv);
-					needs_trampoline = true;
-					return asyncres;
-				}
-				result = command.cinfo.handler(args, I, command.priv);
-				while (typeof result === 'function') {
-					// Support tailcalls
-					result = result();
-				}
-			} catch(e) {
-				result = e;
+						if (!needs_trampoline) {
+							return got_result(result);
+						}
+						return trampoline(got_result(result));
+					} catch(e2){
+						return got_result(asTclError(e2));
+					}
+				}, args, I, cinfo.priv);
+				needs_trampoline = true;
+				return asyncres;
 			}
-			return got_result(result);
-		}, function(err){
-			if (!(err instanceof TclResult)) {
-				if (!(err instanceof TclError)) {
-					err = new TclError(err);
-				}
-				err = err.toTclResult();
+			result = cinfo.handler(args, I, cinfo.priv);
+			while (typeof result === 'function') {
+				// Support tailcalls
+				result = result();
 			}
-			return c(err);
-		});
+		} catch(e) {
+			result = e;
+		}
+		return got_result(result);
 	}
 
-	this.exec = function(script, c) {
-		var lastresult = new TclResult(OK),
-			parse = tclobj.AsObj(script).GetExecParse(),
-			commands = parse[1], i = 0;
+	this.compile_script = function(commands) {
+		var i, j, word, command = [], out = [];
 
-		return function next_commands(){
-			while (i<commands.length) {
-				return eval_command(commands[i++], function(result){
-					if (result !== null) {
-						if (result.code !== OK) {
-							return c(result);
-						}
-						lastresult = result;
-					}
-					return next_commands;
-				});
+		function compile_word(tokens) {
+			var i, token, word = [], async = false, array, expand = false;
+
+			function fetch_array(array, indexfunc) {
+				var f;
+				if (indexfunc.async) {
+					f = function(c_ok, c_err){
+						var indexwords = [];
+						return indexfunc(indexwords, function(){
+							return c_ok(I.get_array(array, indexwords[0]));
+						}, c_err);
+					};
+					f.async = true;
+					return f;
+				} else {
+					f = function(){
+						var indexwords = [];
+						indexfunc(indexwords);
+						return I.get_array(array, indexwords[0]);
+					};
+					f.async = false;
+					return f;
+				}
 			}
-			return c(lastresult);
+			function run_script(obj) {
+				var f = function(c_ok, c_err){
+					return I.exec(obj, function(res){
+						if (res.code === OK) {
+							return c_ok(res.result);
+						}
+						return c_err(res);
+					}, c_err);
+				};
+				f.async = true;
+				return f;
+			}
+			function fetch_scalar(varname) {
+				var f = function(){
+					return I.get_scalar(varname);
+				};
+				f.async = false;
+				return f;
+			}
+
+			function static_obj(obj) {
+				obj.IncrRefCount();
+				var f = function(words){
+					words.push(obj);
+				};
+				f.async = false;
+				return f;
+			}
+			function resolve_async(words, c_ok, c_err) {
+				var parts = [], outwords, obj, i = 0;
+
+				return (function next_tokens(){
+					var token;
+					while (i<word.length) {
+						token = word[i++];
+						if (typeof token === "function") {
+							if (token.async) {
+								return token(function(resolved){
+									parts.push(resolved);
+									return next_tokens;
+								}, c_err);
+							}
+							parts.push(token());
+						} else {
+							parts.push(token);
+						}
+					}
+
+					if (parts.length > 1) {
+						obj = new StringObj(parts.join(''));
+					} else {
+						obj = parts[0];
+					}
+
+					if (!expand) {
+						words.push(obj);
+						return c_ok;
+					}
+					outwords = obj.GetList();
+					while (i<outwords.length) {
+						words.push(outwords[i++]);
+					}
+					return c_ok;
+				}());
+			}
+			resolve_async.async = true;
+
+			for (i=0; i<tokens.length; i++) {
+				token = tokens[i];
+				switch (token[0]) {
+					case parser.SCRIPT:
+						word.push(run_script(new ScriptObj(token)));
+						async = true;
+						break;
+
+					case parser.INDEX:
+						word.push(fetch_array(array, compile_word(token[1])));
+						// TODO: scan index tokens to see if they can be
+						// processed synchronously
+						async = true;
+						array = undefined;
+						break;
+
+					case parser.ARRAY:
+						array = token[1];
+						break;
+
+					case parser.EXPAND:
+						expand = true;
+						break;
+
+					case parser.TXT:
+						word.push(token[1]);
+						break;
+
+					case parser.VAR:
+						word.push(fetch_scalar(token[1]));
+						break;
+
+					default:
+						//console.log('stripping token: ', token.slice());
+						break;
+				}
+			}
+			if (word.length === 1 && typeof word[0] === "string") {
+				return static_obj(new tclobj.NewString(word[0]));
+			}
+			if (word.length === 0) {
+				return;
+			}
+			return resolve_async;
+		}
+
+		function compile_command(command) {
+			var i, word, async = false, f;
+			for (i=0; i<command.length; i++) {
+				word = command[i];
+				if (word.async) {
+					async = true;
+					break;
+				}
+			}
+			if (async) {
+				f = function(c){
+					var args = [], i = 0;
+					function err(e){
+						if (e instanceof TclResult || e instanceof TclError) {
+							return c(e);
+						}
+						return c((new TclError(e)).toTclResult());
+					}
+					return (function next_args(){
+						var wordfunc;
+						while (i<command.length) {
+							wordfunc = command[i++];
+							if (wordfunc.async) {
+								return wordfunc(args, next_args, err);
+							}
+							wordfunc(args);
+						}
+						return exec_command(args, c);
+					}());
+				};
+				f.async = true;
+				return f;
+			}
+			f = function(c) {
+				var args = [], i;
+				for (i=0; i<command.length; i++) {
+					command[i](args);
+				}
+				return exec_command(args, c);
+			};
+			f.async = false;
+			return f;
+		}
+
+		for (i=0; i<commands.length; i++) {
+			command = [];
+			for (j=0; j<commands[i].length; j++) {
+				word = compile_word(commands[i][j]);
+				if (word !== undefined) {
+					command.push(word);
+				}
+			}
+			if (command.length) {
+				out.push(compile_command(command));
+			}
+		}
+		return function(c){
+			var i = 0, last_res = EmptyResult;
+			return (function next_command(){
+				var cmd;
+				while (i<out.length) {
+					cmd = out[i++];
+					return cmd(function(res){
+						last_res = res;
+						if (res.code === OK) {
+							return next_command;
+						}
+						return c(res);
+					});
+				}
+				return c(last_res);
+			}());
 		};
+	};
+
+	this.exec = function(script, c) {
+		return tclobj.AsObj(script).GetExecParse(I)(c);
 	};
 
 	this.TclEval = function(script, c) {
@@ -547,28 +701,37 @@ return function(/* extensions... */){
 	function resolve_operands(operands, body, c) {
 		var resolved_operands = [], i=0;
 
-		// Optimize the case when all the operands are already resolved
-		for (i=0; i<operands.length; i++) {
-			if (operands[i] instanceof Array) {
-				break;
-			}
-			resolved_operands.push(operands[i]);
-		}
-		if (i === operands.length) {
-			return c(body.apply(null, resolved_operands));
-		}
+		return (function next_operands(){
+			var operand;
+			while (i<operands.length) {
+				operand = operands[i++];
+				if (operand instanceof Array) {
+					switch (operand[1]) {
+						case INTEGER:
+						case FLOAT:
+						case BOOL:
+							resolved_operands.push(operand[2]);
+							continue;
+						case VAR:
+							if (operand[2].length === 1) {
+								resolved_operands.push(I.get_scalar(operand[2][0]));
+								continue;
+							}
+							if (typeof operand[2][1] === 'string') {
+								resolved_operands.push(I.get_array(operand[2][0], operand[2][1]));
+								continue;
+							}
+					}
 
-		return function next_operand() {
-			var operand = operands[i++];
-			if (operand === undefined) {
-				//console.log('operands: ', operands, ' resolve to: ', resolved_operands);
-				return c(body.apply(null, resolved_operands));
+					return resolve_operand(operand, function(resolved){
+						resolved_operands.push(resolved);
+						return next_operands;
+					});
+				}
+				resolved_operands.push(operand);
 			}
-			return resolve_operand(operand, function(resolved){
-				resolved_operands.push(resolved);
-				return next_operand;
-			});
-		};
+			return c(body.apply(null, resolved_operands));
+		}());
 	}
 
 	function not_implemented(){throw new Error('Not implemented yet');}
@@ -693,27 +856,29 @@ return function(/* extensions... */){
 	};
 
 	function eval_operator(op, args, c) {
-		var name = op[3], takes = args.length;
-		if (mathops[takes][name] === undefined) {
+		var name = op[3], takes = args.length,
+			mathop = mathops[takes][name], cached;
+		if (mathop === undefined) {
 			throw new TclError('Invalid operator "'+name+'"');
 		}
-		if (typeof mathops[takes][name] === "string") {
-			if (mathop_cache[takes][name] === undefined) {
+		if (typeof mathop === "string") {
+			cached = mathop_cache[takes];
+			if (cached[name] === undefined) {
 				/*jslint evil: true */
 				if (takes === 1) {
-					mathop_cache[takes][name] = new Function('a',
-						'return '+mathops[takes][name]+' a;'
+					cached[name] = new Function('a',
+						'return '+mathop+' a;'
 					);
 				} else {
-					mathop_cache[takes][name] = new Function('a', 'b',
-						'return a '+mathops[takes][name]+' b;'
+					cached[name] = new Function('a', 'b',
+						'return a '+mathop+' b;'
 					);
 				}
 				/*jslint evil: false */
 			}
-			return resolve_operands(args, mathop_cache[takes][name], c);
+			return resolve_operands(args, cached[name], c);
 		}
-		return mathops[takes][name](args, c);
+		return mathop(args, c);
 	}
 
 	this.TclExpr = function(expr, c) {
@@ -727,39 +892,39 @@ return function(/* extensions... */){
 	this._TclExpr = function(expr, c) {
 		var P = tclobj.AsObj(expr).GetExprStack(), i=0, stack = [];
 		// Algorithm from Harry Hutchins http://faculty.cs.niu.edu/~hutchins/csci241/eval.htm
-		return function next_P(){
-			var thisP = P[i++], res, j, args;
-			if (thisP === undefined) {
-				res = stack.pop();
-				if (stack.length) {
-					throw new Error('Expr stack not empty at end of eval:'+stack);
-				}
-				if (!(res instanceof Array)) {
-					return c(new TclResult(OK, res));
-				}
-				return resolve_operand(res, function(res){
-					return c(new TclResult(OK, res));
-				});
-			}
+		return (function next_P(){
+			var thisP, res, j, args;
+			while (i<P.length) {
+				thisP = P[i++];
 
-			switch (thisP[0]) {
-				case OPERAND:
-					stack.push(thisP);
-					break;
-				case OPERATOR:
-					args = [];
-					j = thisP[2];
-					while (j--) {
-						args.push(stack.pop());
-					}
-					return eval_operator(thisP, args.reverse(), function(res){
-						//console.log('eval_operator '+thisP[3]+' (', args, ') = ', res);
-						stack.push(res);
-						return next_P;
-					});
+				switch (thisP[0]) {
+					case OPERAND:
+						stack.push(thisP);
+						break;
+					case OPERATOR:
+						j = thisP[2];
+						args = new Array(j);
+						while (j--) {
+							args[j] = stack.pop();
+						}
+						return eval_operator(thisP, args, function(res){
+							//console.log('eval_operator '+thisP[3]+' (', args, ') = ', res);
+							stack.push(res);
+							return next_P;
+						});
+				}
 			}
-			return next_P;
-		};
+			res = stack.pop();
+			if (stack.length) {
+				throw new Error('Expr stack not empty at end of eval:'+stack);
+			}
+			if (!(res instanceof Array)) {
+				return c(new TclResult(OK, res));
+			}
+			return resolve_operand(res, function(res){
+				return c(new TclResult(OK, res));
+			});
+		}());
 	};
 
 	this.TclError = TclError;

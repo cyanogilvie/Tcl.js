@@ -18,7 +18,8 @@ require([
 ) {
 	"use strict";
 
-	var scriptobj;
+	var scriptobj,
+		EmptyResult = new types.TclResult(types.OK, tclobj.NewString(''));
 
 	function show_script(commands, node) {
 		var command, first, word, i, j;
@@ -66,7 +67,7 @@ require([
 			innerHTML: '<h4>Raw Parse</h4>'+commands.join('\n')
 		}, 'output');
 		domConstruct.create('pre', {
-			innerHTML: '<h4>Exec Parse</h4>'+obj.GetExecParse().join('\n')
+			innerHTML: '<h4>Exec Parse</h4>'+obj.GetExecParse(interp)
 		}, 'output');
 		node = domConstruct.create('pre', {}, 'output');
 		show_script(commands[1], node);
@@ -101,9 +102,26 @@ require([
 				c('delayed result');
 			}, 2000);
 		});
-		interp.TclEval(script, function(result){
+		interp.registerCommand('nop', function(){
+			return EmptyResult;
+		});
+		var before, after, nowfunc;
+		if (window.performance === undefined) {
+			window.performance = {
+				now: function(){return Date.now();}
+			};
+		}
+		if (window.performance.now === undefined && window.performance.webkitNow !== undefined) {
+			window.performance.now = window.performance.webkitNow;
+		}
+		before = performance.now();
+		interp.TclEval(obj, function(result){
+			var usec;
+			after = performance.now();
+			usec = (after - before) * 1000;
+			domConstruct.create('span', {className: 'timing', innerHTML: usec+' microseconds\n'}, outputnode);
 			if (result.code === types.OK) {
-				console.log('Got ok: ', result, ' string concat: "'+result.result+'"');
+				console.log('Got ok: ', result, ' string concat: "'+result+'", '+usec+' microseconds');
 				domConstruct.create('span', {className: 'tclresult', innerHTML: result.result+'\n'}, outputnode);
 			} else {
 				console.log('Got error: ', result, ': "'+result.result+'"');
@@ -188,5 +206,61 @@ require([
 	});
 	query('#cs3').on('click', function(){
 		run('set acc 0; set i 10; puts "i before: $i"; while {[incr i -1]} {puts "loop i: $i"; incr acc $i}; puts $acc');
+	});
+	query('#prof1').on('click', function(){
+		run('for {set i 0} {$i < 10000} {incr i} {nop}');
+	});
+	query('#str1').on('click', function(){
+		run('string length "hello, world"');
+	});
+	query('#str2').on('click', function(){
+		run('string map -nocase {Foo FOO bar bAR b *b*} "hello foo baR world baz"');
+		run('string map {foo FOO bar bAR b *b*} "hello foo bar world baz"');
+	});
+	query('#str3').on('click', function(){
+		run('string trim " 	hello,\nworld\n\t "');
+		run('string trim "hello,\nworld\n\t "');
+		run('string trim " 	hello,\nworld"');
+		run('string trim "hello,\nworld"');
+		run('string trim "/hello,\nworld|" /|');
+	});
+	query('#str4').on('click', function(){
+		run('string trimleft " 	hello,\nworld\n\t "');
+		run('string trimleft "hello,\nworld\n\t "');
+		run('string trimleft " 	hello,\nworld"');
+		run('string trimleft "hello,\nworld"');
+		run('string trimleft "/hello,\nworld|" /|');
+	});
+	query('#str5').on('click', function(){
+		run('string trimright " 	hello,\nworld\n\t "');
+		run('string trimright "hello,\nworld\n\t "');
+		run('string trimright " 	hello,\nworld"');
+		run('string trimright "hello,\nworld"');
+		run('string trimright "/hello,\nworld|" /|');
+	});
+	query('#str6').on('click', function(){
+		run('string tolower "hello, World"');
+		run('string tolower "hello, World" 4');
+		run('string tolower "hello, World" 4 4+3');
+		run('string tolower "hello, World" 4 end');
+		run('string tolower "hello, World" 4 end-2');
+	});
+	query('#str7').on('click', function(){
+		run('string toupper "hello, World"');
+		run('string toupper "hello, World" 4');
+		run('string toupper "hello, World" 4 4+3');
+		run('string toupper "hello, World" 4 end');
+		run('string toupper "hello, World" 4 end-2');
+	});
+	query('#str8').on('click', function(){
+		run('string totitle "hello, WORLD"');
+		run('string totitle "hello, WORLD" 4');
+		run('string totitle "hello, WORLD" 4 4+3');
+		run('string totitle "hello, WORLD" 4 end');
+		run('string totitle "hello, WORLD" 4 end-2');
+	});
+	query('#str9').on('click', function(){
+		run('string bytelength "hello, world"');
+		run('string bytelength "は"');
 	});
 });

@@ -12,9 +12,7 @@ define([
 
 var problem_chars = /[ "{}$;\t\f\n\r\v\[\]]/,
 	hex_chars = /[\dabcdefABCDEF]/,
-	whitespace = /\s/,
-	true_values = ['1', 'yes', 'true', 'on'],
-	false_values = ['0', 'no', 'false', 'off'];
+	whitespace = /\s/;
 
 // Exceptions <<<
 function ParseError(message) {
@@ -571,23 +569,33 @@ function complete(str) { //<<<
 
 //>>>
 function bool(str) { //<<<
-	var normstr = str.toLowerCase(), i, asnum = utils.to_number(normstr);
-	if (!isNaN(asnum)) {
-		return asnum !== 0;
+	var m, num;
+	function err(){
+		throw new Error('invalid boolean value "'+str+'"');
 	}
+	switch (typeof str) {
+		case 'number': return !isNaN(str) && str !== 0;
+		case 'object':
+			if (str instanceof types.TclObject) {
+				return str.GetBool();
+			}
+			str = str.toString();
+		case 'string':
+			if (m = /^(t(?:r(?:ue?)?)?|y(?:es?)?|on)/i.exec(str)) {
+				if (m[0].length !== str.length) {err();}
+				return true;
+			}
+			if (m = /^(0|f(?:a(?:l(?:se?)?)?)?|no?|off?)/i.exec(str)) {
+				if (m[0].length !== str.length) {err();}
+				return false;
+			}
 
-	if (normstr === 'o') {throw new Error('Invalid boolean value "'+str+'"');}
-	for (i=0; i<true_values.length; i++) {
-		if (true_values[i].substr(0, normstr.length) === normstr) {
-			return true;
-		}
+			num = utils.to_number(str);
+			if (isNaN(num)) {err();}
+			return num !== 0;
+		default:
+			err();
 	}
-	for (i=0; i<false_values.length; i++) {
-		if (false_values[i].substr(0, normstr.length) === normstr) {
-			return false;
-		}
-	}
-	throw new Error('invalid boolean value "'+str+'"');
 }
 
 //>>>

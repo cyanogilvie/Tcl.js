@@ -47,27 +47,26 @@ var boolhandlers = {
 		obj.FreeJsVal();
 		obj.jsval = newjsval;
 	}
-};
+}, TclObject = types.TclObject;
 
 function any2bool(value) {
+	if (value instanceof TclObject) {
+		switch (value.handlers.type) {
+			case 'jsval':	value = value.jsval;	break;
+			case 'bool':	return value.jsval;
+			case 'int':		value = value.GetInt();	break;
+			default:
+				if (value.cache.bool !== undefined) {
+					return value.cache.bool;
+				}
+				value = value.toString();
+		}
+	}
 	switch (typeof value) {
 		case 'boolean':	return value;
-		case 'number':	return value !== 0;
-		case 'Object':
-			if (value instanceof TclObject) {
-				switch (value.handlers.type) {
-					case 'int':		return value.GetInt() !== 0;
-					case 'bool':	return value.jsval;
-					default:
-						if (value.cache.bool !== undefined) {
-							return value.cache.bool;
-						}
-				}
-			}
-			value = obj.toString();
-			// Falls through
+		case 'number':	return !isNaN(value) && value !== 0;
 		case 'string':	return tcllist.bool(value);
-		default:		return Boolean(value);
+		default:		throw new Error('invalid boolean value "'+value+'"');
 	}
 }
 
@@ -83,7 +82,7 @@ tclobj.RegisterObjType('bool', boolhandlers);
 types.TclObjectBase.GetBool = function(){
 	if (this.handlers !== boolhandlers) {
 		if (this.cache.bool === undefined) {
-			this.cache.bool = any2bool(this.toString());
+			this.cache.bool = any2bool(this);
 		}
 		return this.cache.bool;
 	}

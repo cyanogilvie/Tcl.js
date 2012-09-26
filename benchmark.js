@@ -96,7 +96,9 @@ requirejs([
 		interp.TclExpr(eobj, function(){});
 	}, {onComplete: report});
 
-	var e2obj = tclobj.AsObj('$a+-min(3, 4)+[get_num]-$b([get_num]) eq "42 [get_num]"');
+	var e2obj;
+	//e2obj = tclobj.AsObj('$a+-min(3, 4)+[get_num]-$b([get_num]) eq "42 [get_num]"');
+	e2obj = tclobj.AsObj('$a+-min(3, 4)+[get_num]-$b([get_num]) eq {42}');
 	eobj.IncrRefCount();
 	interp.registerCommand('get_num', function(args){
 		return 43;
@@ -113,6 +115,9 @@ requirejs([
 	suite.add('sync parsed complex expr', function(){
 		interp.TclExpr(eobj, function(){});
 	}, {onComplete: report});
+	interp.TclExpr(eobj, function(res){
+		console.log('sync parsed complex expr result: '+res.result);
+	});
 
 	var lobj = tclobj.AsObj('1 2 3');
 	lobj.IncrRefCount();

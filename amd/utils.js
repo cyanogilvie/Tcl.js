@@ -104,10 +104,10 @@ var TclError = types.TclError, utils = {
 
 		idx = obj.GetString();
 		if (idx === 'end') {
-			return len;
+			return len-1;
 		}
 		if (matches = /^(.*?)([+\-])(.*)$/.exec(idx)) {
-			a = matches[1] === 'end' ? len : utils.to_int(matches[1]);
+			a = matches[1] === 'end' ? len-1 : utils.to_int(matches[1]);
 			op = matches[2];
 			b = utils.to_int(matches[3]);
 			switch (op) {

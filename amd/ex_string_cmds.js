@@ -48,12 +48,12 @@ function compare_strings(fn) {
 	return function(args, I){
 		I.checkArgs(args, [2, 5], '?-nocase? ?-length int? string1 string2');
 		var ignorecase = false,
-			str2 = args.pop(),
-			str1 = args.pop(),
+			str2 = args.pop().toString(),
+			str1 = args.pop().toString(),
 			maxchars;
 		args.shift();
 		while (args.length > 0) {
-			switch (args[1].toString()) {
+			switch (args[0].toString()) {
 				case '-nocase': ignorecase = true; args.shift(); break;
 				case '-length':
 					args.shift();
@@ -63,7 +63,7 @@ function compare_strings(fn) {
 					maxchars = args.shift().GetInt();
 					break;
 				default:
-					throw new TclError('bad option "'+args[1].toString()+'": must be -nocase or -length', ['TCL', 'LOOKUP', 'INDEX', 'option', args[1].toString()]);
+					throw new TclError('bad option "'+args[0].toString()+'": must be -nocase or -length', ['TCL', 'LOOKUP', 'INDEX', 'option', args[0].toString()]);
 			}
 		}
 
@@ -308,12 +308,12 @@ subcmds = {
 		I.checkArgs(args, 2, 'string index');
 		var str = args[1].toString(),
 			index = get_str_idx(str, args[2]);
-		return new StringObj(str[index] || '');
+		return new StringObj(str.charAt(index) || '');
 	},
 	range: function(args, I){
 		I.checkArgs(args, 3, 'string first last');
 		var str = args[1].toString(),
-			first = get_str_idx(str, args[2]),
+			first = Math.max(0, get_str_idx(str, args[2])),
 			last = get_str_idx(str, args[3]),
 			res = str.substr(first, last-first+1);
 		return new StringObj(res === undefined ? '' : res);
@@ -338,11 +338,9 @@ subcmds = {
 	replace: function(args, I){
 		I.checkArgs(args, [3, 4], 'string first last ?newstring?');
 		var str = args[1].toString(),
-			first = get_str_idx(str, args[2]),
-			last = get_str_idx(str, args[3]),
+			first = Math.max(0, get_str_idx(str, args[2])),
+			last = Math.min(str.length, get_str_idx(str, args[3])),
 			parts = [];
-		if (first < 0) {first = 0;}
-		if (last > str.length-1) {last = str.length-1;}
 		if (first > last) {return types.EmptyString;}
 		if (first > 0)				{ parts.push(str.substr(0, first)); }
 		if (args[4] !== undefined)	{ parts.push(args[4].toString()); }
@@ -401,18 +399,18 @@ subcmds = {
 			str = args.pop().toString(),
 			strict = false, failindexvar, failindex, arg;
 		while (args.length > 0) {
-			arg = args.pop().toString();
+			arg = args.shift().toString();
 			switch (arg) {
 				case '-strict': strict = true; break;
 				case '-failindex':
 					if (args.length < 1) {
 						throw new TclError('wrong # args: should be "string is class ?-strict? ?-failindex varname? string', ['TCL', 'WRONGARGS']);
 					}
-					failindexvar = args.pop();
+					failindexvar = args.shift();
 					break;
 			}
 		}
-		if (class_tests[charclass] === 'undefined') {
+		if (class_tests[charclass] === undefined) {
 			throw new TclError('bad class "'+charclass+'": must be '+utils.objkeys(class_tests).join(', '), ['TCL', 'LOOKUP', 'INDEX', 'class', charclass]);
 		}
 		if (str.length === 0) {

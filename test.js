@@ -263,4 +263,106 @@ require([
 		run('string bytelength "hello, world"');
 		run('string bytelength "は"');
 	});
+	query('#str10').on('click', function(){
+		run('string first bar "foo bar baz"');
+		run('string first bat "foo bar baz"');
+		run('string first bar "foo bar baz" 4');
+		run('string first bar "foo bar baz" 6');
+	});
+	query('#str11').on('click', function(){
+		run('string last bar "foo bar baz"');
+		run('string last bat "foo bar baz"');
+		run('string last bar "foo bar baz" 4');
+		run('string last bar "foo bar baz" 2');
+		run('string last bar "foo bar baz" end-2');
+	});
+	query('#str12').on('click', function(){
+		run('string index "hello, world" 0');
+		run('string index "hello, world" 4');
+		run('string index "hello, world" end');
+		run('string index "hello, world" end-1');
+	});
+	query('#str13').on('click', function(){
+		run('string range "hello, world" -1 100');
+		run('string range "hello, world" 4 end');
+		run('string range "hello, world" 0 end-1');
+		run('string range "hello, world" 0 0+5');
+	});
+	query('#str14').on('click', function(){
+		run('string reverse "hello, world"');
+	});
+	query('#str15').on('click', function(){
+		run('string repeat "xy" 4');
+		run('string repeat "xy" -1');
+	});
+	query('#str16').on('click', function(){
+		run('string replace "hello, world" 0 end');
+		run('string replace "hello, world" 0 end NEW');
+		run('string replace "hello, world" -1 100 NEW');
+		run('string replace "hello, world" 1 100 NEW');
+		run('string replace "hello, world" 1 5 NEW');
+		run('string replace "hello, world" 1 end-2 NEW');
+		run('string replace "hello, world" end-8 end-2 NEW');
+	});
+	query('#str17').on('click', function(){
+		run('string match *lo,* "hello, world"');
+		run('string match *lo!* "hello, world"');
+		run('string match *lo, "hello, world"');
+		run('string match lo,* "hello, world"');
+		run('string match lo, "hello, world"');
+		run('string match {*[lx]lo? *} "hello, world"');
+		run('string match {*[ax]lo? *} "hello, world"');
+		run('string match -nocase *lo,* "HELLO, WORLD"');
+		run('string match -nocase *lo!* "HELLO, WORLD"');
+		run('string match -nocase *lo, "HELLO, WORLD"');
+		run('string match -nocase lo,* "HELLO, WORLD"');
+		run('string match -nocase lo, "HELLO, WORLD"');
+		run('string match -nocase {*[lx]lo? *} "HELLO, WORLD"');
+		run('string match -nocase {*[ax]lo? *} "HELLO, WORLD"');
+	});
+	query('#str18').on('click', function(){
+		run('string wordstart "foo bar baz" 3');
+		run('string wordstart "foo bar baz" 2');
+		run('string wordstart "foo bar baz" 4');
+		run('string wordstart "foo bar baz" 0');
+		run('string wordstart "foo bar baz" -2');
+		run('string wordstart "foo bar baz" 20');
+	});
+	query('#str19').on('click', function(){
+		run('string wordend "foo bar baz" -2');
+		run('string wordend "foo bar baz" 3');
+		run('string wordend "foo bar baz" 2');
+		run('string wordend "foo bar baz" 4');
+		run('string wordend "foo bar baz" 10');
+		run('string wordend "foo bar baz" 20');
+	});
+	query('#str20').on('click', function(){
+		run('string compare foo bar');
+		run('string compare foo foo');
+		run('string compare bar foo');
+	});
+	query('#str21').on('click', function(){
+		run('string equal foo bar');
+		run('string equal foo foo');
+		run('string equal foo Foo');
+		run('string equal -nocase foo Foo');
+		run('string equal -length 2 foo fox');
+		run('string equal -length 3 foo fox');
+	});
+	query('#str22').on('click', function(){
+		run('string is alnum ""');
+		run('string is alnum -strict ""');
+		run('string is alnum "foobar"');
+		run('string is alnum "foo,bar"');
+		run('string is alnum "foo42bar"');
+		run('string is alnum "foo bar"');
+		run('string is alnum "fooBar"');
+		run('set fv notset; string is alnum -failindex fv ""; set fv');
+		run('set fv notset; string is alnum -failindex fv -strict ""; set fv');
+		run('set fv notset; string is alnum -failindex fv "foobar"; set fv');
+		run('set fv notset; string is alnum -failindex fv "foo,bar"; set fv');
+		run('set fv notset; string is alnum -failindex fv "foo42bar"; set fv');
+		run('set fv notset; string is alnum -failindex fv "foo bar"; set fv');
+		run('set fv notset; string is alnum -failindex fv "fooBar"; set fv');
+	});
 });

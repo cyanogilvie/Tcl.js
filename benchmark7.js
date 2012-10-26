@@ -43,6 +43,7 @@ requirejs([
 	cmd2 = new StringObj('string map {foo FOO bar bAR b *b*} "hello foo bar world baz"');
 	cmd3 = new StringObj('string trim " 	hello, world\n\t "');
 	cmd4 = new StringObj('string trim "/hello, world||" /|');
+	cmd5 = new StringObj('string match {*[ax]lo? *} "hello, world"');
 
 	suite.add('string length', function(){
 		interp.TclEval(cmd1, function(){});
@@ -58,6 +59,10 @@ requirejs([
 
 	suite.add('string trim specific chars', function(){
 		interp.TclEval(cmd4, function(){});
+	}, {onComplete: report});
+
+	suite.add('string match', function(){
+		interp.TclEval(cmd5, function(){});
 	}, {onComplete: report});
 
 	suite.run();

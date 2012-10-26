@@ -58,7 +58,7 @@ function trampoline(res) {
 }
 
 return function(/* extensions... */){
-	var args = Array.prototype.slice.call(arguments),
+	var interp_args = Array.prototype.slice.call(arguments),
 		I = this, mathops, mathfuncs, mathop_cache = [null, {}, {}];
 
 	this.vars = {};
@@ -942,8 +942,8 @@ return function(/* extensions... */){
 	(function(){
 		var i;
 		// Load the extensions
-		for (i=0; i<args.length; i++) {
-			args[i].install(this);
+		for (i=0; i<interp_args.length; i++) {
+			interp_args[i].install(this);
 		}
 	}());
 };

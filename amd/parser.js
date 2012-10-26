@@ -230,7 +230,7 @@ function parse(text, mode) {
 			// : alone is a name terminator
 			idx = token.replace(/::/, '__').indexOf(':');
 			if (idx > 0) {
-				token.substr(0, idx);
+				token = token.substr(0, idx);
 			}
 			i += token.length;
 			if (text[i] !== '(') {
@@ -284,7 +284,10 @@ function parse(text, mode) {
 						if (text[i+1] !== undefined && !/[\s;]/.test(text[i+1])) {
 							throw new ParseError('extra characters after close-quote');
 						}
-						emit_waiting(TXT);
+						// Need to manually emit rather than using emit_waiting
+						// because we still need it if token === ''
+						tokens.push([TXT, token]);
+						token = '';
 						emit([SYNTAX, text[i++]]);
 						return tokens;
 

@@ -94,7 +94,7 @@ subcmds = {
 		return c(new DictObj(args.slice(1)));
 	},
 	exists: function(c, args, I){
-		I.checkArgs(args, [3, null], 'dictionaryValue key ?key ...? value');
+		I.checkArgs(args, [2, null], 'dictionaryValue key ?key ...?');
 		args.shift();
 		var dictobj = args.shift(),
 			keys = args,

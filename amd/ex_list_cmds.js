@@ -97,7 +97,7 @@ function install(interp) {
 
 	interp.registerCommand('lindex', function(args){
 		var i, obj, idx, list;
-		interp.checkArgs(args, 1, 'list ?index ...?');
+		interp.checkArgs(args, [1, null], 'list ?index ...?');
 
 		obj = args[1];
 

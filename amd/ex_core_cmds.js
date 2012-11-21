@@ -2,6 +2,7 @@
 /*global define */
 
 define([
+	'./ex_callframes',
 	'./ex_control_cmds',
 	'./ex_list_cmds',
 	'./ex_dict_cmds',
@@ -9,6 +10,7 @@ define([
 	'./types',
 	'./objtype_int'
 ], function(
+	ex_callframes,
 	ex_control_cmds,
 	ex_list_cmds,
 	ex_dict_cmds,
@@ -25,7 +27,7 @@ function install(interp) {
 
 	/* Core commands still to implement:
 	 after append apply array binary clock coroutine format global info interp
-	 namespace package proc regexp regsub rename scan subst tailcall time trace
+	 namespace package regexp regsub rename scan subst tailcall time trace
 	 update uplevel upvar variable vwait yield zlib
 	 */
 
@@ -121,6 +123,7 @@ function install(interp) {
 		return interp.exec(parts.join(' '), c);
 	});
 
+	ex_callframes.install(interp);
 	ex_control_cmds.install(interp);
 	ex_list_cmds.install(interp);
 	ex_dict_cmds.install(interp);

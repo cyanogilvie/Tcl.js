@@ -207,6 +207,14 @@ require([
 	query('#cs3').on('click', function(){
 		run('set acc 0; set i 10; puts "i before: $i"; while {[incr i -1]} {puts "loop i: $i"; incr acc $i}; puts $acc');
 	});
+	query('#cf1').on('click', function(){
+		run('set v global; puts "v in global, before: ($v)"; proc p {v {d foo}} {puts "v in proc: ($v), d: ($d)"; set v updated}; p 1; puts "v in global, after: ($v)"');
+		run('set v global; puts "v in global, before: ($v)"; proc p {v {d foo}} {puts "v in proc: ($v), d: ($d)"; set v updated}; p; puts "v in global, after: ($v)"');
+		run('set v global; puts "v in global, before: ($v)"; proc p {v {d foo}} {puts "v in proc: ($v), d: ($d)"; set v updated}; p 1 2 3; puts "v in global, after: ($v)"');
+		run('set v global; puts "v in global, before: ($v)"; proc p {v {d foo}} {puts "v in proc: ($v), d: ($d)"; set v updated}; p 1 2; puts "v in global, after: ($v)"');
+		run('set v global; puts "v in global, before: ($v)"; proc p {v {d foo} args} {puts "v in proc: ($v), d: ($d), args: ($args)"; set v updated}; p 1 2; puts "v in global, after: ($v)"');
+		run('set v global; puts "v in global, before: ($v)"; proc p {v {d foo} args} {puts "v in proc: ($v), d: ($d), args: ($args)"; set v updated}; p 1 2 3 4; puts "v in global, after: ($v)"');
+	});
 	query('#prof1').on('click', function(){
 		run('for {set i 0} {$i < 10000} {incr i} {nop}');
 	});

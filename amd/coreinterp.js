@@ -94,6 +94,24 @@ return function(/* extensions... */){
 	};
 
 	this.delete_var = function(varname) {
+		var e, arr;
+		if (this.vars[varname] === undefined) {
+			return;
+		}
+		switch (this.vars[varname].type) {
+			case SCALAR:
+				this.vars[varname].value.DecrRefCount();
+				break;
+			case ARRAY:
+				arr = this.vars[varname].value;
+				for (e in arr) {
+					if (arr.hasOwnProperty(e)) {
+						arr[e].value.DecrRefCount();
+						delete arr[e];
+					}
+				}
+				break;
+		}
 		delete this.vars[varname];
 	};
 
@@ -955,6 +973,7 @@ return function(/* extensions... */){
 	this.TclError = TclError;
 	this.TclResult = TclResult;
 	this.tclobj = tclobj;
+	this.EmptyResult = EmptyResult;
 
 	this.register_extension = function(ex) {
 		if (this.extensions[ex] === undefined) {
@@ -962,6 +981,10 @@ return function(/* extensions... */){
 			return false;
 		}
 		return true;
+	};
+
+	this.override = function(fn, new_implmentation){
+		I[fn] = new_implmentation;
 	};
 
 	(function(){

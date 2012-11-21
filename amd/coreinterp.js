@@ -74,30 +74,51 @@ return function(/* extensions... */){
 	};
 
 	this.resolve_var = function(varname) {
-		var vinfo = this.vars[varname];
-		if (vinfo === undefined) {
-			throw new TclError('can\'t read "'+varname+'": no such variable',
-				['TCL', 'LOOKUP', 'VARNAME', varname]);
+		return this.vars[varname];
+	};
+
+	this.create_var = function(varname, index) {
+		if (index === undefined) {
+			this.vars[varname] = {
+				type: SCALAR,
+				value: EmptyString
+			};
+			this.vars[varname].value.IncrRefCounT();
+		} else {
+			this.vars[varname] = {
+				type: ARRAY,
+				value: {}
+			};
 		}
-		return vinfo;
+		return this.vars[varname];
+	};
+
+	this.delete_var = function(varname) {
+		delete this.vars[varname];
 	};
 
 	this.var_exists = function(varname) {
-		return this.vars[varname] !== undefined;
+		return this.resolve_var(varname) !== undefined;
 	};
 
 	this.scalar_exists = function(varname) {
-		return	this.vars[varname] !== undefined &&
-				this.vars[varname].type === SCALAR;
+		var vinfo = this.resolve_var(varname);
+		return	vinfo !== undefined &&
+				vinfo.type === SCALAR;
 	};
 
 	this.array_exists = function(varname) {
-		return	this.vars[varname] !== undefined &&
-				this.vars[varname].type === ARRAY;
+		var vinfo = this.resolve_var(varname);
+		return	vinfo !== undefined &&
+				vinfo.type === ARRAY;
 	};
 
 	this.get_scalar = function(varname, make_unshared) {
 		var vinfo = this.resolve_var(varname), obj;
+		if (vinfo === undefined) {
+			throw new TclError('can\'t read "'+varname+'": no such variable',
+				['TCL', 'LOOKUP', 'VARNAME', varname]);
+		}
 		if (vinfo.type === ARRAY) {
 			throw new TclError('can\'t read "'+varname+'": variable is array',
 				['TCL', 'READ', 'VARNAME']);
@@ -113,6 +134,10 @@ return function(/* extensions... */){
 
 	this.get_array = function(array, index, make_unshared) {
 		var vinfo = this.resolve_var(array), obj;
+		if (vinfo === undefined) {
+			throw new TclError('can\'t read "'+array+'": no such variable',
+				['TCL', 'LOOKUP', 'VARNAME', array]);
+		}
 		if (vinfo.type !== ARRAY) {
 			throw new TclError('can\'t read "'+array+'('+index+')": variable isn\'t array',
 				['TCL', 'LOOKUP', 'VARNAME', array]);
@@ -134,9 +159,9 @@ return function(/* extensions... */){
 	};
 
 	this.set_scalar = function(varname, value) {
-		var vinfo = this.vars[varname];
+		var vinfo = this.resolve_var(varname);
 		if (vinfo === undefined) {
-			vinfo = this.vars[varname] = {type: SCALAR};
+			vinfo = this.create_var(varname);
 		}
 		if (vinfo.type === ARRAY) {
 			throw new TclError('can\'t set "'+varname+'": variable is array',
@@ -151,9 +176,9 @@ return function(/* extensions... */){
 	};
 
 	this.set_array = function(array, index, value) {
-		var vinfo = this.vars[array];
+		var vinfo = this.resolve_var(array);
 		if (vinfo === undefined) {
-			vinfo = this.vars[array] = {type: ARRAY, value: {}};
+			vinfo = this.create_var(array, index);
 		}
 		if (vinfo.type !== ARRAY) {
 			throw new TclError('can\'t set "'+array+'('+index+')": variable isn\'t array',
@@ -185,7 +210,7 @@ return function(/* extensions... */){
 		varname = tclobj.AsVal(varname);
 		if (varname[varname.length-1] === ')') {
 			parts = parse_varname(varname);
-			vinfo = this.vars[parts[0]];
+			vinfo = this.resolve_var(parts[0]);
 			if (report_errors && (vinfo === undefined || vinfo[parts[1]] === undefined)) {
 				throw new TclError('can\'t unset "'+varname+'": no such variable', ['TCL', 'LOOKUP', 'VARNAME']);
 			}
@@ -193,10 +218,10 @@ return function(/* extensions... */){
 			delete vinfo[parts[1]];
 			return;
 		}
-		if (report_errors && this.vars[varname] === undefined) {
+		if (report_errors && this.resolve_var(varname) === undefined) {
 			throw new TclError('can\'t unset "'+varname+'": no such variable', ['TCL', 'LOOKUP', 'VARNAME']);
 		}
-		delete this.vars[varname];
+		this.delete_var(varname);
 		return;
 	};
 

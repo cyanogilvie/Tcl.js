@@ -7,6 +7,7 @@ define([
 	'./ex_list_cmds',
 	'./ex_dict_cmds',
 	'./ex_string_cmds',
+	'./ex_array_cmds',
 	'./types',
 	'./objtype_int'
 ], function(
@@ -15,6 +16,7 @@ define([
 	ex_list_cmds,
 	ex_dict_cmds,
 	ex_string_cmds,
+	ex_array_cmds,
 	types,
 	IntObj
 ){
@@ -26,7 +28,7 @@ function install(interp) {
 	if (interp.register_extension('ex_core_cmds')) {return;}
 
 	/* Core commands still to implement:
-	 after append apply array binary clock coroutine format global info interp
+	 after append apply binary clock coroutine format global info interp
 	 namespace package regexp regsub rename scan subst tailcall time trace
 	 update uplevel upvar variable vwait yield zlib
 	 */
@@ -128,6 +130,7 @@ function install(interp) {
 	ex_list_cmds.install(interp);
 	ex_dict_cmds.install(interp);
 	ex_string_cmds.install(interp);
+	ex_array_cmds.install(interp);
 }
 
 return {'install': install};

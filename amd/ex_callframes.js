@@ -124,7 +124,7 @@ function install(interp) {
 		function assign_args() {
 			return function(a){
 				interp.set_scalar('args', new List(a));
-				while (a.length) {a.pop();}
+				a.length = 0;
 			};
 		}
 

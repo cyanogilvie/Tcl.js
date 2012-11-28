@@ -83,7 +83,7 @@ return function(/* extensions... */){
 				type: SCALAR,
 				value: EmptyString
 			};
-			this.vars[varname].value.IncrRefCounT();
+			this.vars[varname].value.IncrRefCount();
 		} else {
 			this.vars[varname] = {
 				type: ARRAY,

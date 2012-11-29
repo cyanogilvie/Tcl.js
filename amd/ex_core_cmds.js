@@ -28,7 +28,7 @@ function install(interp) {
 	if (interp.register_extension('ex_core_cmds')) {return;}
 
 	/* Core commands still to implement:
-	 after append apply binary clock coroutine format global info interp
+	 after binary clock coroutine format global info interp
 	 namespace package regexp regsub rename scan subst tailcall time trace
 	 update uplevel upvar variable vwait yield zlib
 	 */
@@ -90,7 +90,6 @@ function install(interp) {
 	});
 
 	interp.registerCommand('return', function(args){
-		interp.checkArgs(args, [0, null], '?value?');
 		var i, k, v, options = [], code = types.RETURN, value, level;
 
 		if (args.length % 2 === 1) {
@@ -123,6 +122,32 @@ function install(interp) {
 			parts.push(/^[ \t\n\r]*(.*?)[ \t\n\r]*$/.exec(args[i].toString())[1]);
 		}
 		return interp.exec(parts.join(' '), c);
+	});
+
+	interp.registerCommand('append', function(args){
+		interp.checkArgs(args, [1, null], 'varName ?value ...?');
+		var parts = [], obj, i, varname = args[1].toString(),
+			vinfo = interp.resolve_var(varname);
+
+		if (vinfo === undefined) {
+			vinfo = interp.create_var(varname);
+		}
+		if (vinfo.type !== types.SCALAR) {
+			throw new TclError('can\'t set "'+varname+'": variable is array', ['TCL', 'WRITE', 'VARNAME']);
+		}
+		if (vinfo.value.IsShared()) {
+			obj = vinfo.value.DuplicateObj();
+			vinfo.value.DecrRefCount();
+			vinfo.value = obj;
+			obj.IncrRefCount();
+		}
+		for (i=2; i<args.length; i++) {
+			parts.push(args[i].toString());
+		}
+		vinfo.value.ConvertToType('string');
+		vinfo.value.jsval += parts.join('');
+		vinfo.value.InvalidateCaches();
+		return vinfo.value;
 	});
 
 	ex_callframes.install(interp);

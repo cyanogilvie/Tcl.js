@@ -144,6 +144,7 @@ return function(/* extensions... */){
 		obj = vinfo.value;
 		if (make_unshared && obj.refCount > 1) {
 			obj = obj.DuplicateObj();
+			vinfo.value.DecrRefCount();
 			vinfo.value = obj;
 			obj.IncrRefCount();
 		}
@@ -168,6 +169,7 @@ return function(/* extensions... */){
 			obj = vinfo.value[index];
 			if (make_unshared && obj.refCount > 1) {
 				obj = obj.DuplicateObj();
+				vinfo.value[index].DecrRefCount();
 				vinfo.value[index] = obj;
 				obj.IncrRefCount();
 			}

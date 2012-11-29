@@ -23,7 +23,8 @@ define([
 'use strict';
 
 var TclResult = types.TclResult,
-	TclError = types.TclError;
+	TclError = types.TclError,
+	codeRetObj = new IntObj(types.RETURN);
 
 function install(interp) {
 	if (interp.register_extension('ex_core_cmds')) {return;}
@@ -91,9 +92,9 @@ function install(interp) {
 	});
 
 	interp.registerCommand('return', function(args){
-		var i, k, v, options = [], code = types.RETURN, value, level;
+		var i=1, k, v, options = [], code = codeRetObj, value, level;
 
-		if (args.length % 2 === 1) {
+		if ((args.length - 1) % 2 === 1) {
 			value = args.pop();
 		} else {
 			value = types.EmptyString;
@@ -114,7 +115,7 @@ function install(interp) {
 		if (level === undefined) {
 			options.push('-level', types.IntOne);
 		}
-		return new TclResult(options.code.GetInt(), value, options);
+		return new TclResult(code.GetInt(), value, options);
 	});
 
 	interp.registerAsyncCommand('eval', function(c, args){

@@ -22,7 +22,8 @@ define([
 ){
 'use strict';
 
-var TclResult = types.TclResult;
+var TclResult = types.TclResult,
+	TclError = types.TclError;
 
 function install(interp) {
 	if (interp.register_extension('ex_core_cmds')) {return;}

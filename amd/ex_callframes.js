@@ -10,8 +10,7 @@ define([
 ){
 'use strict';
 
-var TclResult = types.TclResult,
-	SCALAR = types.SCALAR,
+var SCALAR = types.SCALAR,
 	ARRAY = types.ARRAY,
 	EmptyString = types.EmptyString;
 
@@ -100,11 +99,8 @@ function install(interp) {
 		frame = callframes[callframes.length-1];
 	};
 
-	interp.registerCommand('proc', function(args){
-		interp.checkArgs(args, 3, 'name args body');
-
-		var args_desc = [args[1].toString()], arg_assigners = [],
-			args_list = args[2].GetList(), i, arg_info;
+	function compile_args(args_list, initial_args) {
+		var args_desc = initial_args, arg_assigners = [], arg_info, i;
 
 		function assign_required_arg(name) {
 			return function(a){
@@ -148,23 +144,32 @@ function install(interp) {
 					arg_assigners.push(assign_optional_arg(arg_info[0], arg_info[1]));
 					break;
 				default:
-					throw new TclError('too many fields in argument specifier "'+args[i].toString()+'"', ['TCL', 'OPERATION', 'PROC', 'FORMALARGUMENTFORMAT']);
+					throw new TclError('too many fields in argument specifier "'+args_list[i].toString()+'"', ['TCL', 'OPERATION', 'PROC', 'FORMALARGUMENTFORMAT']);
 					
 			}
 		}
 
-		args_desc = args_desc.join(' ');
+		return {
+			args_desc: args_desc.join(' '),
+			arg_assigners: arg_assigners
+		};
+	}
+
+	interp.registerCommand('proc', function(args){
+		interp.checkArgs(args, 3, 'name args body');
+
+		var arg_info = compile_args(args[2].GetList(), [args[1].toString()]);
 
 		interp.registerAsyncCommand(args[1], function(c, pargs){
 			var i;
 			pargs.shift();
 			interp.push_callframe();
 			try {
-				for (i=0; i<arg_assigners.length; i++) {
-					arg_assigners[i](pargs);
+				for (i=0; i<arg_info.arg_assigners.length; i++) {
+					arg_info.arg_assigners[i](pargs);
 				}
 				if (pargs.length > 0) {
-					throw new TclError('wrong # args: should be "'+args_desc+'"', ['TCL', 'WRONGARGS']);
+					throw new TclError('wrong # args: should be "'+arg_info.args_desc+'"', ['TCL', 'WRONGARGS']);
 				}
 				return interp.exec(args[3], function(res){
 					// TODO: for errors, assemble errorInfo and friends
@@ -178,6 +183,37 @@ function install(interp) {
 		});
 
 		return interp.EmptyResult;
+	});
+
+	interp.registerAsyncCommand('apply', function(c, args){
+		interp.checkArgs(args, [1, null], 'lambdaExpr ?arg ...?');
+		var l, i, linfo;
+		if (args[1].cache.lambda === undefined) {
+			linfo = args[1].GetList();
+			args[1].cache.lambda = compile_args(linfo[0].GetList(),
+					['apply', 'lambdaExpr']);
+			args[1].cache.lambda.body = linfo[1];
+			args[1].cache.lambda.ns = linfo[2];
+		}
+		l = args[1].cache.lambda;
+		args.shift();
+		interp.push_callframe();
+		try {
+			for (i=0; i<l.arg_assigners.length; i++) {
+				l.arg_assigners[i](args);
+			}
+			if (args.length > 0) {
+				throw new TclError('wrong # args: should be "'+l.args_desc+'"',
+						['TCL', 'WRONGARGS']);
+			}
+			return interp.exec(l.body, function(res){
+				interp.pop_callframe();
+				return c(res);
+			});
+		} catch(e){
+			interp.pop_callframe();
+			throw e;
+		}
 	});
 }
 

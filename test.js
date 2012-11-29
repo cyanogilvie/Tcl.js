@@ -218,6 +218,10 @@ require([
 	query('#prof1').on('click', function(){
 		run('for {set i 0} {$i < 10000} {incr i} {nop}');
 	});
+	query('#prof2').on('click', function(){
+		run('proc newcmd {a b} {return "$a-$b"}');
+		run('for {set i 0} {$i < 10000} {incr i} {newcmd 1 $i}');
+	});
 	query('#str1').on('click', function(){
 		run('string length "hello, world"');
 	});

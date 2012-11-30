@@ -24,7 +24,7 @@ define([
 
 var TclResult = types.TclResult,
 	TclError = types.TclError,
-	codeRetObj = new IntObj(types.RETURN);
+	codeOkObj = new IntObj(types.OK);
 
 function install(interp) {
 	if (interp.register_extension('ex_core_cmds')) {return;}
@@ -92,7 +92,7 @@ function install(interp) {
 	});
 
 	interp.registerCommand('return', function(args){
-		var i=1, k, v, options = [], code = codeRetObj, value, level;
+		var i=1, k, v, options = [], code, mycode, value, level;
 
 		if ((args.length - 1) % 2 === 1) {
 			value = args.pop();
@@ -103,19 +103,25 @@ function install(interp) {
 			k = args[i++]; v = args[i++];
 			options.push(k, v);
 			if (k === '-code') {
-				if (interp.str_return_codes[v] !== undefined) {
-					code = interp.str_return_codes[v];
-				} else {
-					code = v;
-				}
+				code = types.lookup_code(v);
 			} else if (k === '-level') {
 				level = v;
 			}
 		}
 		if (level === undefined) {
-			options.push('-level', types.IntOne);
+			level = types.IntOne;
+			options.push('-level', level);
 		}
-		return new TclResult(code.GetInt(), value, options);
+		if (code === undefined) {
+			code = codeOkObj;
+			options.push('-code', code);
+		}
+		if (level.GetInt() === 0) {
+			mycode = code.GetInt();
+		} else {
+			mycode = types.RETURN;
+		}
+		return new TclResult(mycode, value, options, level, code);
 	});
 
 	interp.registerAsyncCommand('eval', function(c, args){

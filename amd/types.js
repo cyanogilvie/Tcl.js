@@ -17,14 +17,16 @@ var types = {
 
 types.EmptyString.IncrRefCount();
 
-function TclResult(code, result, options) {
+function TclResult(code, result, options, level, finalcode) {
+	var i;
 	this.code = code;
 	if (result === undefined || (typeof result === 'string' && result === '')) {
 		result = types.EmptyString;
 	}
 	this.result = tclobj.AsObj(result);
 	this.options = options || [];
-	this.options.push('-code', code);
+	this.level = level || 0;
+	this.finalcode = finalcode || 0;
 }
 TclResult.prototype = {
 	toString: function(){

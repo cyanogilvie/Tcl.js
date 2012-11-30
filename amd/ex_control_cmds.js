@@ -6,19 +6,24 @@ define([
 	'./utils',
 	'./objtype_bool',
 	'./objtype_dict',
+	'./objtype_list',
 	'./objtype_list'
 ], function(
 	types,
 	utils,
 	BoolObj,
 	DictObj,
-	ListObj
+	ListObj,
+	IntObj
 ){
 'use strict';
 
 var TclError = types.TclError,
 	TclResult = types.TclResult,
-	EmptyString = types.EmptyString;
+	EmptyString = types.EmptyString,
+	intZero = new IntObj(0),
+	intThree = new IntObj(3),
+	intFour = new IntObj(4);
 
 function install(interp){
 	if (interp.register_extension('ex_control_cmds')) {return;}
@@ -29,12 +34,14 @@ function install(interp){
 
 	interp.registerCommand('continue', function(args){
 		interp.checkArgs(args, 0, '');
-		return new TclResult(types.CONTINUE, EmptyString, ['-level', 0]);
+		return new TclResult(types.CONTINUE, EmptyString,
+			['-level', intZero, '-code', intFour], 0, 4);
 	});
 
 	interp.registerCommand('break', function(args){
 		interp.checkArgs(args, 0, '');
-		return new TclResult(types.BREAK, EmptyString, ['-level', 0]);
+		return new TclResult(types.BREAK, EmptyString,
+			['-level', intZero, '-code', intThree], 0, 3);
 	});
 
 	interp.registerCommand('error', function(args){

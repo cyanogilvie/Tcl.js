@@ -220,6 +220,9 @@ require([
 	});
 	query('#prof2').on('click', function(){
 		run('proc newcmd {a b} {return "$a-$b"}');
+		//run('proc newcmd {a b} {set b}');
+		//run('proc newcmd {a b} {}');
+		//run('for {set i 0} {$i < 10000} {incr i} {set lastres [newcmd 1 $i]}; set lastres');
 		run('for {set i 0} {$i < 10000} {incr i} {newcmd 1 $i}');
 	});
 	query('#str1').on('click', function(){

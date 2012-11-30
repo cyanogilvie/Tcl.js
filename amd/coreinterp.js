@@ -411,7 +411,9 @@ return function(/* extensions... */){
 						return got_result(asTclError(e2));
 					}
 				}, args, I, cinfo.priv);
-				needs_trampoline = true;
+				if (typeof asyncres !== 'function') {
+					needs_trampoline = true;
+				}
 				return asyncres;
 			}
 			result = cinfo.handler(args, I, cinfo.priv);

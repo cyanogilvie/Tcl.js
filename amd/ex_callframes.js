@@ -174,6 +174,12 @@ function install(interp) {
 				return interp.exec(args[3], function(res){
 					// TODO: for errors, assemble errorInfo and friends
 					interp.pop_callframe();
+					if (res.code === types.RETURN) {
+						if (--res.level <= 0) {
+							res.code = res.finalcode.GetInt();
+							res.level = 0;
+						}
+					}
 					return c(res);
 				});
 			} catch(e){
@@ -208,6 +214,12 @@ function install(interp) {
 			}
 			return interp.exec(l.body, function(res){
 				interp.pop_callframe();
+				if (res.code === types.RETURN) {
+					if (--res.level <= 0) {
+						res.code = res.finalcode.GetInt();
+						res.level = 0;
+					}
+				}
 				return c(res);
 			});
 		} catch(e){

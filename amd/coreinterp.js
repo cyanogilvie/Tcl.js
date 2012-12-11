@@ -198,7 +198,7 @@ return function(/* extensions... */){
 	this.set_array = function(array, index, value) {
 		var vinfo = this.resolve_var(array);
 		if (vinfo === undefined) {
-			vinfo = this.create_var(array, index);
+			vinfo = this.create_var(array, '');
 		}
 		if (vinfo.type !== ARRAY) {
 			throw new TclError('can\'t set "'+array+'('+index+')": variable isn\'t array',
@@ -978,6 +978,7 @@ return function(/* extensions... */){
 	this.TclResult = TclResult;
 	this.tclobj = tclobj;
 	this.EmptyResult = EmptyResult;
+	this.types = types;
 
 	this.register_extension = function(ex) {
 		if (this.extensions[ex] === undefined) {

@@ -21,9 +21,10 @@ function TclResult(code, result, options, level, finalcode) {
 	var i;
 	this.code = code;
 	if (result === undefined || (typeof result === 'string' && result === '')) {
-		result = types.EmptyString;
+		this.result = types.EmptyString;
+	} else {
+		this.result = tclobj.AsObj(result);
 	}
-	this.result = tclobj.AsObj(result);
 	this.options = options || [];
 	this.level = level || 0;
 	this.finalcode = finalcode || 0;

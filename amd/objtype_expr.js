@@ -29,7 +29,9 @@ var expr_handlers = {
 		return newjsval;
 	},
 	updateString: function(obj){
-		obj.bytes = parse2string(obj.jsval.commands[1]);
+		//obj.bytes = parse2string(obj.jsval.commands[1]);
+		//obj.bytes = parse2string(obj.jsval.parse);
+		obj.bytes = obj.jsval.orig_string;
 	},
 	setFromAny: function(obj){
 		var newjsval = jsval_from_string(obj.toString());
@@ -43,6 +45,7 @@ function ExprObj(value) {
 	if (value instanceof Array) {
 		this.jsval = {parse: value};
 	} else {
+		this.jsval.orig_string = value;
 		this.jsval = jsval_from_string(String(value));
 	}
 }

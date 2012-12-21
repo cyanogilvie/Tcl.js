@@ -11,13 +11,14 @@ define([
 'use strict';
 
 function Interp(){
-	var args = Array.prototype.slice.call(arguments), i;
-	ex_core_cmds.install(this);
+	var args = Array.prototype.slice.call(arguments), i,
+		I = new CoreInterp();
+	ex_core_cmds.install(I);
 	for (i=0; i<args.length; i++) {
-		args[i].install(this);
+		args[i].install(I);
 	}
+	return I;
 };
-Interp.prototype = new CoreInterp();
 
 return Interp;
 });

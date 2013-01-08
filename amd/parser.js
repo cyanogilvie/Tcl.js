@@ -19,15 +19,15 @@ var iface, e,
 	OPERAND		= 11,
 	OPERATOR	= 12,
 	LPAREN		= 13,
-	RPAREN		= 13,
-	FLOAT		= 14,
-	INTEGER		= 15,
-	MATHFUNC	= 16,
-	BOOL		= 17,
-	EXPR		= 18,
-	ARG			= 19,
-	QUOTED		= 20,
-	BRACED		= 21,
+	RPAREN		= 14,
+	FLOAT		= 15,
+	INTEGER		= 16,
+	MATHFUNC	= 17,
+	BOOL		= 18,
+	EXPR		= 19,
+	ARG			= 20,
+	QUOTED		= 21,
+	BRACED		= 22,
 	t = {
 		TXT		: TXT,
 		SPACE	: SPACE,
@@ -265,7 +265,7 @@ function parse(text, mode) {
 		return tokens;
 	}
 
-	function parse_combined(quoted, incmdsubst) {
+	function parse_combined(quoted, incmdsubst, ignore_trailing) {
 		var matched;
 
 		if (quoted) {
@@ -281,7 +281,7 @@ function parse(text, mode) {
 						throw new ParseError('missing "');
 
 					case '"':
-						if (text[i+1] !== undefined && !/[\s;]/.test(text[i+1])) {
+						if (!ignore_trailing && text[i+1] !== undefined && !/[\s;]/.test(text[i+1])) {
 							throw new ParseError('extra characters after close-quote');
 						}
 						// Need to manually emit rather than using emit_waiting
@@ -402,7 +402,7 @@ function parse(text, mode) {
 		}
 
 		function parse_quoted() {
-			parse_combined(true, false);
+			parse_combined(true, false, true);
 		}
 
 		function sub_parse(subtoken, func, make_crep) {
@@ -629,7 +629,7 @@ function expr2stack(expr) {
 				if (stack.length === 0) {
 					throw new Error('Unbalanced close parenthesis in expression');
 				}
-				while (stack.length && stack[stack.length-1][0] !== LPAREN) {
+				while (stack.length) {
 					item = stack.pop();
 					if (item[0] === LPAREN) {
 						break;

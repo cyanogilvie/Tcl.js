@@ -54,7 +54,10 @@ function asTclError(e) {
 }
 
 function trampoline(res) {
-	while (typeof res === "function") {res = res();}
+	while (typeof res === "function" && res.tcl_break_trampoline === undefined) {
+		res = res();
+	}
+	return res;
 }
 
 return function(/* extensions... */){
@@ -648,7 +651,7 @@ return function(/* extensions... */){
 
 	this.TclEval = function(script, c) {
 		try {
-			trampoline(this.exec(script, c));
+			return trampoline(this.exec(script, c));
 		} catch(e){
 			return c(asTclError(e).toTclResult());
 		}
@@ -930,7 +933,7 @@ return function(/* extensions... */){
 
 	this.TclExpr = function(expr, c) {
 		try {
-			trampoline(this._TclExpr(expr, c));
+			return trampoline(this._TclExpr(expr, c));
 		} catch(e){
 			return c(asTclError(e).toTclResult());
 		}

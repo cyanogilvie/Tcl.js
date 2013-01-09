@@ -103,7 +103,14 @@ NewObj = function(type, value) {
 		if (value instanceof Array) {
 			type = 'list';
 		} else if (typeof value === 'object') {
-			type = 'dict';
+			if (value instanceof Date) {
+				// TODO: possibly build a date objtype, that preserves the js Date
+				// instance in its jsval?  (With smart toString and setFromAny)
+				type = 'jsval';
+				value = value.toUTCString();
+			} else {
+				type = 'dict';
+			}
 		} else {
 			type = 'jsval';
 		}

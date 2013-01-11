@@ -49,10 +49,14 @@ TclObjectBase = {
 		return this.toString();
 	},
 	DuplicateObj: function(){
+		var obj;
 		if (this.jsval === null) {
 			this.handlers.updateJsVal(this);
 		}
-		return NewObj([this.handlers.type], this.handlers.dupJsVal(this));
+		obj = new TclObject();
+		obj.handlers = this.handlers;
+		obj.jsval = this.handlers.dupJsVal(this);
+		return obj;
 	},
 	IsShared: function(){
 		return this.refCount > 1;
@@ -75,6 +79,13 @@ TclObjectBase = {
 	InvalidateCaches: function(){
 		this.bytes = null;
 		this.cache = {};
+	},
+	replace: function(old){
+		if (old != null && old.DecrRefCount !== undefined) {
+			old.DecrRefCount()
+		}
+		this.IncrRefCount();
+		return this;
 	}
 };
 

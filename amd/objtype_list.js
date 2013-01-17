@@ -58,6 +58,7 @@ listhandlers = {
 function ListObj(value) {
 	var i;
 	this.handlers = listhandlers;
+	this._init();
 	if (value instanceof Array) {
 		this.jsval = [];
 		for (i=0; i<value.length; i++) {

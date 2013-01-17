@@ -82,6 +82,7 @@ function DictObj(value) {
 	var e, i;
 
 	this.handlers = dicthandlers;
+	this._init();
 	if (value instanceof Array) {
 		if (value.length % 2 !== 0) {
 			throw new Error('Cannot convert array with odd number of elements to a dict');

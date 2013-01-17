@@ -32,6 +32,7 @@ var inthandlers = {
 
 function IntObj(value) {
 	this.handlers = inthandlers;
+	this._init();
 	this.jsval = utils.to_int(value);
 }
 IntObj.prototype = new tclobj.TclObject();

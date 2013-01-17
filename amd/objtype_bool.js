@@ -72,10 +72,10 @@ function any2bool(value) {
 
 function BoolObj(value) {
 	this.handlers = boolhandlers;
-
+	this._init();
 	this.jsval = any2bool(value);
 }
-BoolObj.prototype = new tclobj.TclObject();
+BoolObj.prototype = new TclObject();
 
 tclobj.RegisterObjType('bool', boolhandlers);
 

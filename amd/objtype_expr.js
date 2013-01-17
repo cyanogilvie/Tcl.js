@@ -42,6 +42,7 @@ var expr_handlers = {
 
 function ExprObj(value) {
 	this.handlers = expr_handlers;
+	this._init();
 	if (value instanceof Array) {
 		this.jsval = {parse: value};
 	} else {

@@ -26,6 +26,12 @@ jsvalhandlers = {
 };
 
 TclObjectBase = {
+	_init: function(type){
+		this.refCount = 0;
+		this.bytes = null;
+		this.cache = {};
+	},
+
 	IncrRefCount: function(){
 		this.refCount++;
 	},
@@ -97,11 +103,7 @@ function RegisterObjType(type, handlers) {
 }
 
 function TclObject() {
-	this.handlers = jsvalhandlers;
-	this.jsval = null;
-	this.refCount = 0;
-	this.bytes = null;
-	this.cache = {};
+	// Do not put anything in here, it will be shared by all instances
 }
 TclObject.prototype = TclObjectBase;
 
@@ -134,6 +136,8 @@ NewObj = function(type, value) {
 		throw new Error('ObjType not registered: "'+type+'"');
 	}
 	obj = new TclObject();
+	obj.handlers = jsvalhandlers;
+	obj._init(type);
 	obj.jsval = value;
 	obj.ConvertToType(type);
 	return obj;

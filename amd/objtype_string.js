@@ -28,6 +28,7 @@ var stringhandlers = {
 
 function StringObj(value) {
 	this.handlers = stringhandlers;
+	this._init();
 	this.jsval = String(value);
 }
 StringObj.prototype = new tclobj.TclObject();

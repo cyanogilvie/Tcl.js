@@ -63,6 +63,7 @@ var script_handlers = {
 function ScriptObj(value) {
 	var i;
 	this.handlers = script_handlers;
+	this._init();
 	if (value instanceof Array && value[0] === parser.SCRIPT) {
 		this.jsval = {commands: []};
 		for (i=0; i<value.length; i++) {

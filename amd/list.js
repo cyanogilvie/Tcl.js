@@ -574,6 +574,7 @@ function bool(str) { //<<<
 		throw new Error('invalid boolean value "'+str+'"');
 	}
 	switch (typeof str) {
+		case 'boolean': return str;
 		case 'number': return !isNaN(str) && str !== 0;
 		case 'object':
 			if (str instanceof types.TclObject) {

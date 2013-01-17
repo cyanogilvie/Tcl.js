@@ -111,7 +111,11 @@ NewObj = function(type, value) {
 		type = 'auto';
 	}
 	if (type === 'auto') {
-		if (value instanceof Array) {
+		if (value == null) {
+			// Not so happy about this - it will hide a lot of bugs
+			value = '';
+			type = 'jsval';
+		} else if (value instanceof Array) {
 			type = 'list';
 		} else if (typeof value === 'object') {
 			if (value instanceof Date) {

@@ -161,8 +161,8 @@ function install(interp){
 					return interp.exec(args[i], c);
 				}
 				i++; // skip then body
-				switch (args[i++]) {
-					case undefined:	return c('');
+				if (i >= args.length) {return c(interp.EmptyString);}
+				switch (args[i++].toString()) {
 					case 'elseif':	return next;
 					case 'else':	return interp.exec(args[i], c);
 					default:		return interp.exec(args[i-1], c);
@@ -189,7 +189,7 @@ function install(interp){
 			// TODO somehow translate pat (which is a Tcl style regex) to a
 			// javascript style regex
 			re = new RegExp(pat, ignorecase ? 'i' : '');
-			if (m = re.exec(str)) {
+			if ((m = re.exec(str))) {
 				if (matchvar !== undefined) {
 					I.set_var(matchvar, new ListObj(m));
 				}

@@ -12,8 +12,9 @@ There are several other implementations of Tcl in Javascript, ranging from the t
 * Sufficiently fast - it needs to run some pretty hot code, like realtime filters and transforms on datasets with tens of thousands of rows.
 * As small as possible - since the whole codebase is downloaded at least once (even assuming caching works properly), the size over the wire should be as small as possible.
 * Modular - to further address the above goal, the interpreter should be modular, allowing only those features that are needed to be loaded.
-* Built as AMD modules (ala require.js).
-* Targetting version 8.6 (but without TclOO, for now)
+* Built as AMD modules (loadable with requirejs or dojo).
+* Support asynchronous commands (so that a javascript handler for a Tcl command can return without providing a result and then supply the result later when it is available, at which point the Tcl script continues).
+* Targetting version 8.6 (but without TclOO, for now).
 This attempt does not completely reach the above goals yet, but it is sufficiently close for my needs, and with time I hope that the supported subset will grow.
 
 What Does It Look Like?

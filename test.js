@@ -197,6 +197,12 @@ require([
 		//expr('6 + -3 + 43 - 4');
 		//expr('2+-min(3, 4)+[get_num]');
 	});
+	query('#expr2').on('click', function(){
+		expr('"2012-12-30" <= "2013-01-17"');
+	});
+	query('#expr3').on('click', function(){
+		expr('"2013-01-17" <= "2012-12-30"');
+	});
 
 	query('#cs1').on('click', function(){
 		run('if {[getstring] eq "result of getstring"} {puts "then body"} else {puts "else body"}');

@@ -3,6 +3,13 @@ Tcl in Javascript
 
 This project is an attempt at a robust, high performance subset of the Tcl language, implemented in Javascript.
 
+Why Tcl in a Browser?
+---------------------
+
+I use Tcl extensively as an extension language, or to implement domain specific languages for configuration or defining custom behaviour for business objects.  These Tcl scripts often come from users, so Tcl's safe interpreters provided a nice sandbox for running these scripts.
+
+The market has changed, and no longer wants to install native applications (in Tk, or anything else for that matter), particularly in an enterprise environment.  To address this we moved our frontend application to Javascript in a browser, which also extends the reach to mobile devices.  But the frontend still needs to support all the existing DSL code, and rewriting it in Javascript wouldn't solve it because running untrusted Javascript scripts in the browser (via eval or new Function) is an unaceptable security and stability risk.  This interpreter addresses both these concerns.
+
 Why Another One?
 ----------------
 
@@ -42,7 +49,7 @@ main.js:
 require(['tcl/interp'], function(Interp){
 	var I = Interp();
 
-	I.registerCmd('annoy_user', function(args){
+	I.registerCommand('annoy_user', function(args){
 		I.checkArgs(args, 1, 'string');
 		alert(args[1]);
 	});
@@ -61,3 +68,45 @@ require(['tcl/interp'], function(Interp){
 	});
 });
 ```
+
+How Fast Is It?
+---------------
+
+The performance relative to a native Tcl interpreter will vary widely depending on which areas of the interpreter are stressed, but attempting to measure the command dispatch (and to an extent, expression evaluation and variable accesses), the following code:
+
+```tcl
+for {set i 0} {$i < 10000} {incr i} {nop}
+```
+
+With `nop` implemented in native Tcl as:
+
+```tcl
+proc nop args {}
+```
+
+and in jstcl as:
+
+```javascript
+var I = Interp();
+I.registerCommand('nop', function(){
+	return I.EmptyResult;
+});
+```
+
+The timings are as follows (on my MacBook Air with a Core i5 @ 1.8GHz):
+
+* Native Tcl 8.6, not in bytecoded context: 7765 microseconds per iteration
+* Native Tcl 8.6, in bytecoded context (using `apply`): 6508 microseconds per iteration
+* jstcl (bytecode context N/A) on V8 (Google Chrome 24): 57967 microseconds per iteration
+
+So it's around an order of magnitude slower than native, but I expect that there is about a 25% reduction remaining to be gained with reasonable effort.
+
+What Is The License?
+--------------------
+
+jstcl is copyright Cyan Ogilvie, and licensed under the same terms as Tcl.  (BSD-ish)
+
+Why Are All The Headings Questions?
+-----------------------------------
+
+I don't know.  It bothers me also.

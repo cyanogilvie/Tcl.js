@@ -25,6 +25,8 @@ HTML:
 <!DOCTYPE html>
 <html>
 	<head>
+		<title>jstcl</title>
+		<meta charset="utf-8" />
 		<script data-main="main" src="require.js"></script>
 	</head>
 	<body>

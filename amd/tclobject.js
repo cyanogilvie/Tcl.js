@@ -46,7 +46,7 @@ TclObjectBase = {
 		}
 	},
 	toString: function(){
-		if (this.bytes === null) {
+		if (this.bytes == null) {
 			this.handlers.updateString(this);
 		}
 		return this.bytes;
@@ -56,7 +56,7 @@ TclObjectBase = {
 	},
 	DuplicateObj: function(){
 		var obj;
-		if (this.jsval === null) {
+		if (this.jsval == null) {
 			this.handlers.updateJsVal(this);
 		}
 		obj = new TclObject();
@@ -68,7 +68,7 @@ TclObjectBase = {
 		return this.refCount > 1;
 	},
 	valueOf: function(){
-		if (this.jsval === null) {
+		if (this.jsval == null) {
 			this.handlers.updateJsVal(this);
 		}
 		return this.jsval;

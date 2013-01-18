@@ -20,7 +20,7 @@ What Does It Look Like?
 -----------------------
 
 HTML:
-'''html
+```html
 <!DOCTYPE html>
 <html>
 	<head>
@@ -29,10 +29,10 @@ HTML:
 	<body>
 	</body>
 </html>
-'''
+```
 
 main.js:
-'''js
+```javascript
 require(['tcl/interp'], function(Interp){
 	var I = Interp();
 
@@ -54,4 +54,4 @@ require(['tcl/interp'], function(Interp){
 		}
 	});
 });
-'''
+```

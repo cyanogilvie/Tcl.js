@@ -99,7 +99,7 @@ The timings are as follows (on my MacBook Air with a Core i5 @ 1.8GHz):
 * Native Tcl 8.6, in bytecoded context (using `apply`): 6508 microseconds per iteration
 * jstcl (bytecode context N/A) on V8 (Google Chrome 24): 57967 microseconds per iteration
 
-So it's around an order of magnitude slower than native, but I expect that there is about a 25% reduction remaining to be gained with reasonable effort.
+So it's around an order of magnitude slower than native, but I expect that there is about a 25% improvement remaining to be gained with reasonable effort.
 
 What Is The License?
 --------------------

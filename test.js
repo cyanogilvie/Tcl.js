@@ -1,5 +1,5 @@
 /*jslint plusplus: true, white: true, nomen: true */
-/*global require */
+/*global require, window */
 
 require([
 	'tcl/parser',
@@ -18,8 +18,17 @@ require([
 ) {
 	"use strict";
 
-	var scriptobj,
-		EmptyResult = new types.TclResult(types.OK, tclobj.NewString(''));
+	var now, scriptobj;
+
+	if (window.performance === undefined) {
+		now = function(){
+			return Date.now();
+		};
+	} else if (window.performance.now !== undefined) {
+		now = function(){return window.performance.now();}
+	} else if (window.performance.webkitNow !== undefined) {
+		now = function(){return window.performance.webkitNow();};
+	}
 
 	function show_script(commands, node) {
 		var command, first, word, i, j;
@@ -58,17 +67,23 @@ require([
 		}
 	}
 
-	function run(script) {
+	function run(script, setup) {
 		var interp = new TclInterp(),
 			obj = tclobj.AsObj(script),
 			commands = obj.GetParsedScript(), node, outputnode;
 
+		if (setup) {
+			setup(interp);
+		}
+
 		domConstruct.create('pre', {
 			innerHTML: '<h4>Raw Parse</h4>'+commands.join('\n')
 		}, 'output');
+		/*
 		domConstruct.create('pre', {
 			innerHTML: '<h4>Exec Parse</h4>'+obj.GetExecParse(interp)
 		}, 'output');
+		 */
 		node = domConstruct.create('pre', {}, 'output');
 		show_script(commands[1], node);
 		outputnode = domConstruct.create('pre', {
@@ -102,22 +117,11 @@ require([
 				c('delayed result');
 			}, 2000);
 		});
-		interp.registerCommand('nop', function(){
-			return EmptyResult;
-		});
-		var before, after, nowfunc;
-		if (window.performance === undefined) {
-			window.performance = {
-				now: function(){return Date.now();}
-			};
-		}
-		if (window.performance.now === undefined && window.performance.webkitNow !== undefined) {
-			window.performance.now = window.performance.webkitNow;
-		}
-		before = performance.now();
+		var before, after;
+		before = now();
 		interp.TclEval(obj, function(result){
 			var usec;
-			after = performance.now();
+			after = now();
 			usec = (after - before) * 1000;
 			domConstruct.create('span', {className: 'timing', innerHTML: usec+' microseconds\n'}, outputnode);
 			if (result.code === types.OK) {
@@ -133,7 +137,7 @@ require([
 
 	function expr(str) {
 		var obj = tclobj.AsObj(str), interp = new TclInterp();
-		interp.registerCommand('get_num', function(args){
+		interp.registerCommand('get_num', function(){
 			return 43;
 		});
 		interp.set_var('a', 6);
@@ -222,14 +226,86 @@ require([
 		run('set v global; puts "v in global, before: ($v)"; proc p {v {d foo} args} {puts "v in proc: ($v), d: ($d), args: ($args)"; set v updated}; p 1 2 3 4; puts "v in global, after: ($v)"');
 	});
 	query('#prof1').on('click', function(){
-		run('for {set i 0} {$i < 10000} {incr i} {nop}');
+		run('for {set i 0} {$i < 10000} {incr i} nop', function(I){
+			I.registerCommand('nop', function(){});
+		});
 	});
 	query('#prof2').on('click', function(){
-		run('proc newcmd {a b} {return "$a-$b"}');
+		//run('proc newcmd {a b} {return "$a-$b"}');
 		//run('proc newcmd {a b} {set b}');
 		//run('proc newcmd {a b} {}');
 		//run('for {set i 0} {$i < 10000} {incr i} {set lastres [newcmd 1 $i]}; set lastres');
-		run('for {set i 0} {$i < 10000} {incr i} {newcmd 1 $i}');
+		run('proc newcmd {a b} {return "$a-$b"}; for {set i 0} {$i < 10000} {incr i} {newcmd 1 $i}');
+		run('proc nop args {}; for {set i 0} {$i < 10000} {incr i} nop');
+	});
+	query('#prof3').on('click', function(){
+		var BoolObj = require('tcl/objtype_bool');
+		run('for {set i 0} {$i < 10000} {incr i} nop', function(I){
+			var trueObj = new BoolObj(true),
+				falseObj = new BoolObj(false),
+				trueRes = new I.TclResult(I.types.OK, trueObj),
+				falseRes = new I.TclResult(I.types.OK, falseObj);
+
+			I.registerCommand('nop', function(){});
+
+			I.registerAsyncCommand('for', function(c, args){
+				I.checkArgs(args, 4, 'start test next body');
+				var start = args[1], test = args[2], next = args[3], body = args[4];
+				var vn = 'i', tv = 10000;
+				function t(c){
+					var v, r;
+					v = I.get_scalar(vn),
+					r = v.GetInt() < tv;
+					//return c(new I.TclResult(I.types.OK, r));
+					//return c(new I.TclResult(I.types.OK, r ? trueObj : falseObj));
+					return c(r ? trueRes : falseRes);
+				}
+				return I.exec(start, function(res){
+					if (res.code !== types.OK) {return c(res);}
+					return function loop(){
+						return t(function(res){
+							if (res.code !== types.OK) {return c(res);}
+							if (!(res.result.GetBool())) {return c();}
+							return I.exec(body, function(res){
+								switch (res.code) {
+									case types.CONTINUE:
+									case types.OK:
+										return I.exec(next, function(res){
+											if (res.code !== types.OK) {return c(res);}
+											return loop;
+										});
+									case types.BREAK:
+										return c();
+									default:
+										return c(res);
+								}
+							});
+						});
+					};
+				});
+			});
+		});
+	});
+	query('#prof4').on('click', function(){
+		var before, after, i, outputnode;
+
+		outputnode = domConstruct.create('pre', {
+			className: 'script_output'
+		}, 'output');
+
+		function nop(f){return f;}
+
+		before = now();
+		var f, i = 10000;
+		function loop(){
+			if (i-- <= 0) return;
+			return nop(loop);
+		}
+		f = loop;
+		while (typeof f === "function") {f = f();}
+		after = now();
+
+		domConstruct.create('span', {className: 'timing', innerHTML: (after-before)+' microseconds\n'}, outputnode);
 	});
 	query('#str1').on('click', function(){
 		run('string length "hello, world"');
@@ -385,5 +461,8 @@ require([
 		run('set fv notset; string is alnum -failindex fv "foo42bar"; set fv');
 		run('set fv notset; string is alnum -failindex fv "foo bar"; set fv');
 		run('set fv notset; string is alnum -failindex fv "fooBar"; set fv');
+	});
+	query('#cmdredef1').on('click', function(){
+		run('proc foo {} {return initial}; puts "1: [foo]"; proc foo {} {return changed}; puts "2: [foo]"');
 	});
 });

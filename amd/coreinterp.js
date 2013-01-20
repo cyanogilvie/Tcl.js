@@ -273,18 +273,35 @@ return function(/* extensions... */){
 		return this.commands[commandname];
 	};
 
-	this.resolve_command = function(commandname) {
-		var cinfo = this.lookup_command(commandname);
-		if (cinfo === undefined) {
-			throw new TclError('invalid command name "'+commandname+'"');
+	this.resolve_command = function(cmdObj) {
+		var cinfo;
+		if (cmdObj.cache.command === undefined) {
+			cinfo = this.lookup_command(cmdObj);
+			if (cinfo === undefined) {
+				throw new TclError('invalid command name "'+cmdObj+'"');
+			}
+			cmdObj.cache.command = cinfo;
+			cinfo.cacheRefs.push(function(){
+				if (cmdObj && cmdObj.cache) {
+					delete cmdObj.cache.command;
+				}
+			});
+		} else {
+			cinfo = cmdObj.cache.command;
 		}
+
 		return cinfo;
 	};
 
 	function registerCmd(async, commandname, handler, priv, onDelete) {
 		var cinfo = I.lookup_command(commandname);
-		if (cinfo !== undefined && cinfo.onDelete) {
-			cinfo.onDelete(cinfo.priv);
+		if (cinfo !== undefined) {
+			if (cinfo.onDelete) {
+				cinfo.onDelete(cinfo.priv);
+			}
+			while (cinfo.cacheRefs.length > 0) {
+				cinfo.cacheRefs.pop()();
+			}
 		} else {
 			cinfo = I.commands[commandname] = {};
 		}
@@ -292,6 +309,7 @@ return function(/* extensions... */){
 		cinfo.async = async;
 		cinfo.priv = priv;
 		cinfo.onDelete = onDelete;
+		cinfo.cacheRefs = [];
 	}
 
 	this.registerCommand = function(commandname, handler, priv, onDelete) {

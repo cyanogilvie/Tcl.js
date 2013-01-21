@@ -1,6 +1,4 @@
-/*jslint plusplus: true, white: true, nomen: true, continue: true */
 /*global define */
-
 define([
 	'./tclobject',
 	'./parser',

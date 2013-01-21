@@ -75,7 +75,7 @@ How Fast Is It?
 The performance relative to a native Tcl interpreter will vary widely depending on which areas of the interpreter are stressed, but attempting to measure the command dispatch (and to an extent, expression evaluation and variable accesses), the following code:
 
 ```tcl
-for {set i 0} {$i < 10000} {incr i} {nop}
+for {set i 0} {$i < 10000} {incr i} nop
 ```
 
 With `nop` implemented in native Tcl as:
@@ -88,9 +88,7 @@ and in jstcl as:
 
 ```javascript
 var I = Interp();
-I.registerCommand('nop', function(){
-	return I.EmptyResult;
-});
+I.registerCommand('nop', function(){});
 ```
 
 The timings are as follows (on my MacBook Air with a Core i5 @ 1.8GHz):

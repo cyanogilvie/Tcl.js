@@ -4,13 +4,15 @@
 define([
 	'./types',
 	'./utils',
+	'./list',
 	'./objtype_bool',
 	'./objtype_dict',
 	'./objtype_list',
-	'./objtype_list'
+	'./objtype_int'
 ], function(
 	types,
 	utils,
+	list,
 	BoolObj,
 	DictObj,
 	ListObj,
@@ -278,13 +280,37 @@ function install(interp){
 
 	interp.registerAsyncCommand('for', function(c, args){
 		interp.checkArgs(args, 4, 'start test next body');
-		var start = args[1], test = args[2], next = args[3], body = args[4];
-		return interp.exec(start, function(res){
-			if (res.code !== types.OK) {return c(res);}
-			return function loop(){
-				return interp._TclExpr(test, function(res){
-					if (res.code !== types.OK) {return c(res);}
-					if (!(res.result.GetBool())) {return c();}
+		var start = args[1],
+			test = interp.compile_expr(args[2]),
+			next = args[3], body = args[4];
+		if (test.async) {
+			return interp.exec(start, function(res){
+				if (res.code !== types.OK) {return c(res);}
+				return function loop(){
+					return test(function(v){
+						if (!list.bool(v)) return c();
+						return interp.exec(body, function(res){
+							switch (res.code) {
+								case types.CONTINUE:
+								case types.OK:
+									return interp.exec(next, function(res){
+										if (res.code !== types.OK) {return c(res);}
+										return loop;
+									});
+								case types.BREAK:
+									return c();
+								default:
+									return c(res);
+							}
+						});
+					});
+				};
+			});
+		} else {
+			return interp.exec(start, function(res){
+				if (res.code !== types.OK) {return c(res);}
+				return function loop(){
+					if (!list.bool(test())) return c();
 					return interp.exec(body, function(res){
 						switch (res.code) {
 							case types.CONTINUE:
@@ -299,9 +325,9 @@ function install(interp){
 								return c(res);
 						}
 					});
-				});
-			};
-		});
+				};
+			});
+		}
 	});
 
 	interp.registerAsyncCommand('while', function(c, args){

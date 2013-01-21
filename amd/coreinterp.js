@@ -920,7 +920,7 @@ return function(/* extensions... */){
 				case 'boolean': return c(v ? TrueResult : FalseResult);
 				case 'string': return c(new TclResult(OK, new StringObj(v)));
 				case 'number': return c(new TclResult(OK, tclobj.NewObj('jsval', v)));
-				default: return c(new TclResult(OK, tclobj.NewObj('auto', v)));
+				default: return c(new TclResult(OK, tclobj.AsObj(v)));
 			}
 		}
 		return f.async ? f(got_val) : got_val(f());

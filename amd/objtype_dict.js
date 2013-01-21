@@ -59,7 +59,7 @@ var dicthandlers = {
 					if (jsval instanceof String) {
 						a = list.list2array(jsval);
 					} else {
-						throw new Error('Cannot convert type to dict');
+						throw new Error('Cannot convert type to dict: "'+typeof jsval+'"');
 					}
 					break;
 				default:

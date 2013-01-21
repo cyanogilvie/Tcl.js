@@ -1,6 +1,4 @@
-/*jslint plusplus: true, white: true, nomen: true, regexp: true */
 /*global define */
-
 define([
 	'./types',
 	'./objtype_list'
@@ -160,9 +158,8 @@ function install(interp) {
 
 		var arg_info = compile_args(args[2].GetList(), [args[1].toString()]);
 
-		interp.registerAsyncCommand(args[1], function(c, pargs){
-			var i;
-			pargs.shift();
+		interp.registerAsyncCommand(args[1], function(c, const_pargs){
+			var i, pargs = const_pargs.slice(1);
 			interp.push_callframe();
 			try {
 				for (i=0; i<arg_info.arg_assigners.length; i++) {

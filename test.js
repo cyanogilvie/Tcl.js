@@ -123,9 +123,9 @@ require([
 			var usec;
 			after = now();
 			usec = (after - before) * 1000;
-			domConstruct.create('span', {className: 'timing', innerHTML: usec+' microseconds\n'}, outputnode);
+			domConstruct.create('span', {className: 'timing', innerHTML: Math.round(usec)+' microseconds per iteration\n'}, outputnode);
 			if (result.code === types.OK) {
-				console.log('Got ok: ', result, ' string concat: "'+result+'", '+usec+' microseconds');
+				console.log('Got ok: ', result, ' string concat: "'+result+'", '+Math.round(usec)+' microseconds');
 				domConstruct.create('span', {className: 'tclresult', innerHTML: result.result+'\n'}, outputnode);
 			} else {
 				console.log('Got error: ', result, ': "'+result.result+'"');
@@ -224,6 +224,11 @@ require([
 		run('set v global; puts "v in global, before: ($v)"; proc p {v {d foo}} {puts "v in proc: ($v), d: ($d)"; set v updated}; p 1 2; puts "v in global, after: ($v)"');
 		run('set v global; puts "v in global, before: ($v)"; proc p {v {d foo} args} {puts "v in proc: ($v), d: ($d), args: ($args)"; set v updated}; p 1 2; puts "v in global, after: ($v)"');
 		run('set v global; puts "v in global, before: ($v)"; proc p {v {d foo} args} {puts "v in proc: ($v), d: ($d), args: ($args)"; set v updated}; p 1 2 3 4; puts "v in global, after: ($v)"');
+	});
+	query('#cf2').on('click', function(){
+		//run('proc foo {a b} {return "$a-$b"}; foo 1 2; foo 3 4');
+		run('proc newcmd {a b} {return "$a-$b"}; set i 0; newcmd 1 $i; incr i; newcmd 1 $i');
+		run('proc newcmd {a b} {return "$a-$b"}; for {set i 0} {$i < 2} {incr i} {newcmd 1 $i}');
 	});
 	query('#prof1').on('click', function(){
 		run('for {set i 0} {$i < 10000} {incr i} nop', function(I){

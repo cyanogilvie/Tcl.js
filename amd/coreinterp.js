@@ -404,7 +404,9 @@ return function(/* extensions... */){
 
 	function exec_command(args, c) {
 		var cinfo = I.resolve_command(args[0]),
-			result, needs_trampoline = false, asyncres;
+			result, needs_trampoline = false, asyncres, i = args.length;
+
+		while (i>0) {args[--i].IncrRefCount();}
 
 		function normalize_result(result) {
 			if (!(result instanceof TclResult)) {
@@ -420,6 +422,8 @@ return function(/* extensions... */){
 		}
 
 		function got_result(result) {
+			var i = args.length;
+			while (i>0) {args[--i].DecrRefCount();}
 			return c(normalize_result(result));
 		}
 
@@ -456,120 +460,31 @@ return function(/* extensions... */){
 	}
 
 	this.compile_script = function(commands) {
-		var i, j, word, command = [], out = [];
+		var i, j, wordf, command = [], out = [];
 
 		function compile_word(tokens) {
-			var i, token, word = [], async = false, array, expand = false;
-
-			function fetch_array(array, indexfunc) {
-				var f;
-				if (indexfunc.async) {
-					f = function(c_ok, c_err){
-						var indexwords = [];
-						return indexfunc(indexwords, function(){
-							return c_ok(I.get_array(array, indexwords[0]));
-						}, c_err);
-					};
-					f.async = true;
-					return f;
-				} else {
-					f = function(){
-						var indexwords = [];
-						indexfunc(indexwords);
-						return I.get_array(array, indexwords[0]);
-					};
-					f.async = false;
-					return f;
-				}
-			}
-			function run_script(obj) {
-				var f = function(c_ok, c_err){
-					return I.exec(obj, function(res){
-						if (res.code === OK) {
-							return c_ok(res.result);
-						}
-						return c_err(res);
-					}, c_err);
-				};
-				f.async = true;
-				return f;
-			}
-			function fetch_scalar(varname) {
-				var f = function(){
-					return I.get_scalar(varname);
-				};
-				f.async = false;
-				return f;
-			}
-
-			function static_obj(obj) {
-				obj.IncrRefCount();
-				var f = function(words){
-					words.push(obj);
-				};
-				f.async = false;
-				return f;
-			}
-			function resolve_async(words, c_ok, c_err) {
-				var parts = [], outwords, obj, i = 0;
-
-				function token_result(resolved) {
-					parts.push(resolved);
-					return next_tokens;
-				}
-
-				function next_tokens() {
-					var token;
-					while (i<word.length) {
-						token = word[i++];
-						if (typeof token === "function") {
-							if (token.async) {
-								return token(token_result, c_err);
-							}
-							parts.push(token());
-						} else {
-							parts.push(token);
-						}
-					}
-
-					if (parts.length > 1) {
-						obj = new StringObj(parts.join(''));
-					} else {
-						obj = parts[0];
-					}
-
-					if (!expand) {
-						words.push(obj);
-						return c_ok;
-					}
-					outwords = obj.GetList();
-					while (i<outwords.length) {
-						words.push(outwords[i++]);
-					}
-					return c_ok;
-				}
-				return next_tokens();
-			}
-			resolve_async.async = true;
+			var i, token, word=[], async=false, array, expand=false,
+				constant=true, constval='', f, outtokens, dyntokens;
 
 			for (i=0; i<tokens.length; i++) {
 				token = tokens[i];
 				switch (token[0]) {
 					case parser.SCRIPT:
-						word.push(run_script(new ScriptObj(token)));
+						word.push(script_op(token));
+						if (constant) {constant = false;}
 						async = true;
 						break;
 
 					case parser.INDEX:
-						word.push(fetch_array(array, compile_word(token[1])));
-						// TODO: scan index tokens to see if they can be
-						// processed synchronously
-						async = true;
+						f = array_op(array, token[1]);
+						word.push(f);
+						if (!async && f.async) {async = true;}
 						array = undefined;
 						break;
 
 					case parser.ARRAY:
 						array = token[1];
+						if (constant) {constant = false;}
 						break;
 
 					case parser.EXPAND:
@@ -577,77 +492,195 @@ return function(/* extensions... */){
 						break;
 
 					case parser.TXT:
-						word.push(token[1]);
+						word.push(constant_op(token[1]));
+						if (constant) {constval += token[1];}
 						break;
 
 					case parser.VAR:
-						word.push(fetch_scalar(token[1]));
+						word.push(scalar_op(token[1]));
+						if (constant) {constant = false;}
 						break;
 
 					default:
 						//console.log('stripping token: ', token.slice());
 						break;
 				}
-			}
-			if (word.length === 1 && typeof word[0] === "string") {
-				return static_obj(new tclobj.NewString(word[0]));
+
+				if (constant && async) {constant = false;}
 			}
 			if (word.length === 0) {
 				return;
 			}
-			return resolve_async;
+			if (constant) {
+				f = constant_op(new StringObj(constval));
+			} else if (word.length === 1) {
+				f = word[0];
+			} else {
+				outtokens = new Array(word.length);
+				dyntokens = [];
+				for (i=0; i<word.length; i++) {
+					if (word[i].constant) {
+						outtokens[i] = word[i]();
+					} else {
+						dyntokens.push(i, word[i]);
+					}
+				}
+				if (async) {
+					f = function(c){
+						var i=0;
+						function setarg(j) {
+							return function(v){
+								outtokens[j] = v;
+								return loop;
+							};
+						}
+						function loop() {
+							var j, fv;
+							while (i<dyntokens.length) {
+								j = dyntokens[i++];
+								fv = dyntokens[i++];
+								if (fv.async) {
+									return fv(setarg(j));
+								}
+								outtokens[j] = fv();
+							}
+							return c(new StringObj(outtokens.join('')));
+						}
+						return loop();
+					};
+					f.async = true;
+				} else {
+					f = function(){
+						var i;
+						for (i=0; i<dyntokens.length; i+=2) {
+							outtokens[dyntokens[i]] = dyntokens[i+1]();
+						}
+						return new StringObj(outtokens.join(''));
+					};
+				}
+			}
+			f.expand = expand;
+			return f;
 		}
 
 		function compile_command(command) {
-			var i, word, async = false, f;
+			var i, word, expand=false, async=false, constant=true,
+				f, dynwords=[];
+
 			for (i=0; i<command.length; i++) {
 				word = command[i];
-				if (word.async) {
-					async = true;
-					break;
+				if (!expand && word.expand)				expand = true;
+				if (!word.constant) {
+					dynwords.push(i, word);
+					if (constant)
+						constant = false;
 				}
+				if (!async && word.async)				async = true;
 			}
+
+			if (!expand) {
+				var outwords=new Array(command.length);
+				for (i=0; i<command.length; i++) {
+					if (command[i].constant) {
+						outwords[i] = command[i]().replace(outwords[i]);
+					}
+				}
+				if (constant) {
+					return function(c){
+						return exec_command(outwords, c);
+					};
+				}
+				if (async) {
+					f = function(c){
+						var i=0;
+						function setarg(j) {
+							return function(v){
+								outwords[j] = v;
+								return loop;
+							};
+						}
+						function loop() {
+							var j, fv;
+							while (i<dynwords.length) {
+								j = dynwords[i++];
+								fv = dynwords[i++];
+								if (fv.async) {return fv(setarg(j));}
+								outwords[j] = fv();
+							}
+							return exec_command(outwords, c);
+						}
+						return loop;
+					};
+					f.async = true;
+					return f;
+				}
+				return function(c){
+					var i=0, j, fv;
+					while (i<dynwords.length) {
+						j = dynwords[i++];
+						fv = dynwords[i++];
+						outwords[j] = fv();
+					}
+					return exec_command(outwords, c);
+				};
+			}
+
+			// expand
 			if (async) {
 				f = function(c){
-					var args = [], i = 0;
-					function err(e){
-						if (e instanceof TclResult || e instanceof TclError) {
-							return c(e);
+					var words=[], i=0;
+					function setarg(expand) {
+						if (expand) {
+							return function(v){
+								Array.prototype.push.apply(words, v.GetList());
+								return loop;
+							};
 						}
-						return c((new TclError(e)).toTclResult());
+						return function(v){
+							words.push(v);
+							return loop;
+						};
 					}
-					return (function next_args(){
-						var wordfunc;
+					function loop() {
+						var fv;
 						while (i<command.length) {
-							wordfunc = command[i++];
-							if (wordfunc.async) {
-								return wordfunc(args, next_args, err);
+							fv = command[i++];
+							if (fv.async) {
+								return fv(setarg(fv.expand));
 							}
-							wordfunc(args);
+							if (fv.expand) {
+								Array.prototype.push.apply(words, fv().GetList());
+							} else {
+								words.push(fv());
+							}
 						}
-						return exec_command(args, c);
-					}());
+						return exec_command(words, c);
+					}
+					return loop();
 				};
 				f.async = true;
 				return f;
 			}
-			f = function(c) {
-				var args = [], i;
-				for (i=0; i<command.length; i++) {
-					command[i](args);
+			return function(c){
+				var words=[], i=0, fv;
+				while (i<command.length) {
+					fv = command[i++];
+					if (fv.expand) {
+						Array.prototype.push.apply(words, fv().GetList());
+					} else {
+						words.push(fv());
+					}
 				}
-				return exec_command(args, c);
+				return exec_command(words, c);
 			};
-			f.async = false;
-			return f;
 		}
 
 		for (i=0; i<commands.length; i++) {
 			command = [];
 			for (j=0; j<commands[i].length; j++) {
-				word = compile_word(commands[i][j]);
-				if (word !== undefined) {
-					command.push(word);
+				wordf = compile_word(commands[i][j]);
+				if (wordf !== undefined) {
+					command.push(wordf);
 				}
 			}
 			if (command.length) {
@@ -994,34 +1027,30 @@ return function(/* extensions... */){
 		return function(){ return I.get_scalar(varname); };
 	}
 
-	function array_op(varname, index) {
-		var r, f;
-		function err(errmsg) {
-			throw new Error('Error resolving array index: '+errmsg);
-		}
-		if (typeof index === 'string') {
+	function array_op(varname, indextokens) {
+		var f, index, indexfunc;
+
+		if (typeof indextokens === 'string') {
+			index = indextokens;
 			return function(){ return I.get_array(varname, index); };
-		} else {
-			r = check_tokens(index);
-			if (r.async) {
-				f = function(c){
-					return resolve_word(index, function(indexwords){
-						var index = indexwords.length === 1 ?
-								indexwords[0] : indexwords.join('');
-						return c(I.get_array(varname, index));
-					}, err);
-				};
-			} else {
-				f = function(){
-					return trampoline(resolve_word(index, function(indexwords){
-						return I.get_array(varname, indexwords.length === 1 ?
-							indexwords[0] : indexwords.join(''));
-					}, err));
-				};
-			}
-			f.async = r.async;
+		}
+
+		indexfunc = string_op(indextokens);
+		if (indexfunc.constant) {
+			index = indexfunc();
+			return function(){ return I.get_array(varname, index); };
+		}
+
+		if (indexfunc.async) {
+			f = function(c){
+				return indexfunc(function(index){
+					return c(I.get_array(varname, index));
+				});
+			};
+			f.async = true;
 			return f;
 		}
+		return function(){ return I.get_array(varname, indexfunc()); };
 	}
 
 	function script_op(script) {

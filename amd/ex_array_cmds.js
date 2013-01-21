@@ -1,5 +1,4 @@
-/*jslint plusplus: true, white: true, nomen: true, regexp: true, bitwise: true */
-/*global define, require */
+/*global define */
 define([
 	'./utils',
 	'./tclobject',
@@ -173,18 +172,18 @@ function install(interp) {
 	if (interp.register_extension('ex_array_cmds')) {return;}
 
 	interp.registerCommand('array', function(args){
-		var subcmd, cmd;
+		var subcmd, fakeargs=args.slice(1);
 		if (args.length < 2) {
 			interp.checkArgs(args, 1, 'subcmd args');
 		}
 
-		cmd = args.shift(); subcmd = args[0];
-		args[0] = cmd+' '+subcmd;
+		subcmd = args[1];
+		fakeargs[0] = args[0]+' '+subcmd;
 		if (subcmds[subcmd] === undefined) {
 			throw new TclError('unknown or ambiguous subcommand "'+subcmd+'": must be '+utils.objkeys(subcmds).join(', '),
 				['TCL', 'LOOKUP', 'SUBCOMMAND', subcmd]);
 		}
-		return subcmds[subcmd](args, interp);
+		return subcmds[subcmd](fakeargs, interp);
 	});
 }
 

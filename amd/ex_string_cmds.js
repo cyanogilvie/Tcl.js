@@ -1,4 +1,4 @@
-/*jslint plusplus: true, white: true, nomen: true, regexp: true, bitwise: true */
+/*jshint bitwise:false */
 /*global define, require */
 define([
 	'./utils',
@@ -82,12 +82,12 @@ function compare_strings(fn) {
 function int_range_check(bits) {
 	return function(s){
 		var m, value;
-		if (m = (
+		if ((m = (
 			/^[\+\-]?\d+e[\-+]?\d+?/i.exec(s) ||
 			/^[\+\-]?0x[\dA-F]+/i.exec(s) ||
 			/^[\+\-]?0b[01]+/i.exec(s) ||
 			/^[\+\-]?0o[0-7]+/i.exec(s)
-		)) {
+		))) {
 			value = utils.to_int(s);
 			if (Math.abs(value) >= Math.pow(2, bits)) {return null;}
 			return m[0].length === s.length ? -1 : m[0].length;
@@ -124,7 +124,7 @@ class_tests = {
 	digit: function(s){return (/[^\d]/.exec(s)||{index:-1}).index;},
 	'double': function(s){
 		var m, value;
-		if (m = /^(?:([\-+]?)(Inf(?:inity)?)|(NaN))\b/i.exec(s)) {
+		if ((m = /^(?:([\-+]?)(Inf(?:inity)?)|(NaN))\b/i.exec(s))) {
 			if (/n/i.test(m[0][1])) {
 				value = NaN;
 			} else {
@@ -135,17 +135,17 @@ class_tests = {
 			}
 			return -1;
 		}
-		if (m = (
+		if ((m = (
 			/^[\-+]?\d+(?:(\.)(?:\d+)?)?(e[\-+]?\d+)?/i.exec(s) ||
 			/^[\-+]?(\.)\d+(e[\-+]?\d+)?/i.exec(s)
-		)) {
+		))) {
 			value = Number(m[0]);
-		} else if (m = (
+		} else if ((m = (
 			/^[\+\-]?\d+e[\-+]?\d+?/i.exec(s) ||
 			/^[\+\-]?0x[\dA-F]+/i.exec(s) ||
 			/^[\+\-]?0b[01]+/i.exec(s) ||
 			/^[\+\-]?0o[0-7]+/i.exec(s)
-		)) {
+		))) {
 			if (m[0].length !== s.length) {
 				return m[0].length;
 			}
@@ -367,7 +367,7 @@ subcmds = {
 			idx = get_str_idx(str, args[2]);
 		if (idx < 0) {return new IntObj(0);}
 		// TODO: make unicode aware (\w is [0-9a-zA-Z_]), maybe XRegExp?
-		if (m = /\w+$/.exec(str.substr(0, idx+1))) {
+		if ((m = /\w+$/.exec(str.substr(0, idx+1)))) {
 			return new IntObj(m.index);
 		}
 		return new IntObj(idx);
@@ -378,7 +378,7 @@ subcmds = {
 			idx = get_str_idx(str, args[2]);
 		if (idx >= str.length) {return new IntObj(str.length);}
 		// TODO: make unicode aware (\w is [0-9a-zA-Z_]), maybe XRegExp?
-		if (m = /^\w+/.exec(str.substr(idx))) {
+		if ((m = /^\w+/.exec(str.substr(idx)))) {
 			return new IntObj(idx+m[0].length);
 		}
 		return new IntObj(idx+1);
@@ -433,18 +433,18 @@ function install(interp) {
 	if (interp.register_extension('ex_string_cmds')) {return;}
 
 	interp.registerCommand('string', function(args){
-		var subcmd, cmd;
+		var subcmd, fakeargs=args.slice(1);
 		if (args.length < 2) {
 			interp.checkArgs(args, 1, 'subcmd args');
 		}
 
-		cmd = args.shift(); subcmd = args[0];
-		args[0] = cmd+' '+subcmd;
+		subcmd = args[1];
+		fakeargs[0] = args[0]+' '+subcmd;
 		if (subcmds[subcmd] === undefined) {
 			throw new TclError('unknown or ambiguous subcommand "'+subcmd+'": must be '+utils.objkeys(subcmds).join(', '),
 				['TCL', 'LOOKUP', 'SUBCOMMAND', subcmd]);
 		}
-		return subcmds[subcmd](args, interp);
+		return subcmds[subcmd](fakeargs, interp);
 	});
 }
 

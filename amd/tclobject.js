@@ -1,6 +1,5 @@
-/*jslint plusplus: true, white: true, nomen: true, newcap: true */
+/*jshint eqnull:true, newcap:false */
 /*global define */
-
 define(function(){
 'use strict';
 
@@ -26,7 +25,7 @@ jsvalhandlers = {
 };
 
 TclObjectBase = {
-	_init: function(type){
+	_init: function(){
 		this.refCount = 0;
 		this.bytes = null;
 		this.cache = {};
@@ -80,7 +79,7 @@ TclObjectBase = {
 		if (this.handlers.type === type) {return;}
 		objtypes[type].setFromAny(this);
 		this.handlers = objtypes[type];
-		this.InvalidateCaches();
+		//this.InvalidateCaches();
 	},
 	InvalidateCaches: function(){
 		this.bytes = null;
@@ -88,7 +87,7 @@ TclObjectBase = {
 	},
 	replace: function(old){
 		if (old != null && old.DecrRefCount !== undefined) {
-			old.DecrRefCount()
+			old.DecrRefCount();
 		}
 		this.IncrRefCount();
 		return this;
@@ -137,7 +136,7 @@ NewObj = function(type, value) {
 	}
 	obj = new TclObject();
 	obj.handlers = jsvalhandlers;
-	obj._init(type);
+	obj._init();
 	obj.jsval = value;
 	obj.ConvertToType(type);
 	return obj;

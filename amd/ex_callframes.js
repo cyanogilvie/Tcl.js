@@ -4,20 +4,43 @@ define([
 	'./objtype_list'
 ], function(
 	types,
-	List
+	ListObj
 ){
 'use strict';
 
 var SCALAR = types.SCALAR,
 	ARRAY = types.ARRAY,
 	EmptyString = types.EmptyString;
-
 function install(interp) {
 	if (interp.register_extension('ex_callframes')) {return;}
 
 	var callframes = [{}],
 		frame = callframes[0],
 		TclError = interp.TclError;
+
+	function assign_required_arg(name) {
+		return function(a, p){
+			if (p >= a.length) {
+				throw new TclError('wrong # args: should be "'+args_desc+'"', ['TCL', 'WRONGARGS']);
+			}
+			interp.set_scalar(name, a[p++]);
+			return p;
+		};
+	}
+
+	function assign_optional_arg(name, defaultval) {
+		return function(a, p){
+			interp.set_scalar(name, p < a.length ? a[p++] : defaultval);
+			return p;
+		};
+	}
+
+	function assign_args() {
+		return function(a, p){
+			interp.set_scalar('args', new ListObj(a.slice(p)));
+			return a.length;
+		};
+	}
 
 	interp.override('resolve_var', function(varname){
 		return frame[varname];
@@ -78,13 +101,13 @@ function install(interp) {
 				switch (v.type) {
 					case SCALAR:
 						v.value.DecrRefCount();
-						delete v.value;
+						//delete v.value;
 						break;
 					case ARRAY:
 						for (index in v) {
 							if (v.hasOwnProperty(index)) {
 								v[index].value.DecrRefCount();
-								delete v[index];
+								//delete v[index];
 							}
 						}
 						break;
@@ -100,31 +123,9 @@ function install(interp) {
 	function compile_args(args_list, initial_args) {
 		var args_desc = initial_args, arg_assigners = [], arg_info, i;
 
-		function assign_required_arg(name) {
-			return function(a){
-				if (a.length === 0) {
-					throw new TclError('wrong # args: should be "'+args_desc+'"', ['TCL', 'WRONGARGS']);
-				}
-				interp.set_scalar(name, a.shift());
-			};
-		}
-
-		function assign_optional_arg(name, defaultval) {
-			return function(a){
-				interp.set_scalar(name, a.length ? a.shift() : defaultval);
-			};
-		}
-
-		function assign_args() {
-			return function(a){
-				interp.set_scalar('args', new List(a));
-				a.length = 0;
-			};
-		}
-
 		for (i=0; i<args_list.length; i++) {
 			arg_info = args_list[i].GetList();
-			if (i === args_list.length-1 && arg_info[0].toString() === 'args') {
+			if (i === args_list.length-1 && arg_info.length && arg_info[0].toString() === 'args') {
 				args_desc.push('?arg ...?');
 				arg_assigners.push(assign_args());
 				break;
@@ -158,14 +159,15 @@ function install(interp) {
 
 		var arg_info = compile_args(args[2].GetList(), [args[1].toString()]);
 
-		interp.registerAsyncCommand(args[1], function(c, const_pargs){
-			var i, pargs = const_pargs.slice(1);
+		interp.registerAsyncCommand(args[1], function(c, pargs){
+			var i=0, p=1;
 			interp.push_callframe();
 			try {
-				for (i=0; i<arg_info.arg_assigners.length; i++) {
-					arg_info.arg_assigners[i](pargs);
+				while (p<pargs.length && i<arg_info.arg_assigners.length) {
+					p = arg_info.arg_assigners[i](pargs, p);
+					i++;
 				}
-				if (pargs.length > 0) {
+				if (p < pargs.length) {
 					throw new TclError('wrong # args: should be "'+arg_info.args_desc+'"', ['TCL', 'WRONGARGS']);
 				}
 				return interp.exec(args[3], function(res){
@@ -190,7 +192,7 @@ function install(interp) {
 
 	interp.registerAsyncCommand('apply', function(c, args){
 		interp.checkArgs(args, [1, null], 'lambdaExpr ?arg ...?');
-		var l, i, linfo;
+		var l, i=0, p=1, linfo;
 		if (args[1].cache.lambda === undefined) {
 			linfo = args[1].GetList();
 			args[1].cache.lambda = compile_args(linfo[0].GetList(),
@@ -202,10 +204,11 @@ function install(interp) {
 		args.shift();
 		interp.push_callframe();
 		try {
-			for (i=0; i<l.arg_assigners.length; i++) {
-				l.arg_assigners[i](args);
+			while (p<pargs.length && i<l.arg_assigners.length) {
+				p = l.arg_assigners[i](pargs, p);
+				i++;
 			}
-			if (args.length > 0) {
+			if (p < pargs.length) {
 				throw new TclError('wrong # args: should be "'+l.args_desc+'"',
 						['TCL', 'WRONGARGS']);
 			}

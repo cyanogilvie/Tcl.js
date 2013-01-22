@@ -3,4 +3,4 @@ require({
 	packages: [
 		{name: 'tcl', location: 'amd'}
 	]
-},['tcl/parser', 'tcl/interp', 'tcl/tclobject']);
+},['tcl/interp']);

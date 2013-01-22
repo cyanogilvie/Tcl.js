@@ -242,6 +242,11 @@ require([
 		//run('for {set i 0} {$i < 10000} {incr i} {set lastres [newcmd 1 $i]}; set lastres');
 		run('proc newcmd {a b} {return "$a-$b"}; for {set i 0} {$i < 10000} {incr i} {newcmd 1 $i}');
 		run('proc nop args {}; for {set i 0} {$i < 10000} {incr i} nop');
+		run('proc nop {} {}; for {set i 0} {$i < 10000} {incr i} nop');
+		run('proc nop i {}; for {set i 0} {$i < 10000} {incr i} {nop $i}');
+		run('proc nop i {}; for {set i 0} {$i < 10000} {incr i} {nop 1}');
+		run('proc nop {{i {}}} {}; for {set i 0} {$i < 10000} {incr i} nop');
+		run('proc nop args {}; for {set i 0} {$i < 10000} {incr i} {nop $i}');
 	});
 	query('#prof3').on('click', function(){
 		var BoolObj = require('tcl/objtype_bool');

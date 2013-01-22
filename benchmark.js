@@ -108,14 +108,14 @@ requirejs([
 	interp.set_array('b', 'y', 4);
 	interp.set_array('b', '43', 4);
 	suite.add('parsed complex expression', function(deferred){
-		interp.TclExpr(eobj, function(res){
+		interp.TclExpr(e2obj, function(res){
 			deferred.resolve();
 		});
 	}, {defer: true, onComplete: report});
 	suite.add('sync parsed complex expr', function(){
-		interp.TclExpr(eobj, function(){});
+		interp.TclExpr(e2obj, function(){});
 	}, {onComplete: report});
-	interp.TclExpr(eobj, function(res){
+	interp.TclExpr(e2obj, function(res){
 		console.log('sync parsed complex expr result: '+res.result);
 	});
 

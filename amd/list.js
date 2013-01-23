@@ -513,6 +513,7 @@ function to_tcl(from) { //<<<
 	var i, e, staged;
 
 	switch (typeof from) {
+		case 'boolean': return from ? '1' : '0';
 		case 'function':
 		case 'object':
 			if (from instanceof Array) {

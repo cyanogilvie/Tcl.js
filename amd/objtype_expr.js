@@ -18,7 +18,7 @@ function parse2string(parse) {
 
 function jsval_from_string(str) {
 	return {
-		orig_string: value,
+		orig_string: str,
 		parse: parser.parse_expr(str)
 	};
 }

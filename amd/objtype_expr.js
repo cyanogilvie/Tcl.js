@@ -18,6 +18,7 @@ function parse2string(parse) {
 
 function jsval_from_string(str) {
 	return {
+		orig_string: value,
 		parse: parser.parse_expr(str)
 	};
 }
@@ -46,7 +47,6 @@ function ExprObj(value) {
 	if (value instanceof Array) {
 		this.jsval = {parse: value};
 	} else {
-		this.jsval.orig_string = value;
 		this.jsval = jsval_from_string(String(value));
 	}
 }

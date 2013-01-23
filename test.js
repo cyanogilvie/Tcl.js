@@ -7,6 +7,7 @@ require([
 	'tcl/tclobject',
 	'tcl/types',
 	'dojo/dom-construct',
+	'dojo/json',
 	'dojo/query'
 ], function(
 	parser,
@@ -14,6 +15,7 @@ require([
 	tclobj,
 	types,
 	domConstruct,
+	json,
 	query
 ) {
 	"use strict";
@@ -77,7 +79,7 @@ require([
 		}
 
 		domConstruct.create('pre', {
-			innerHTML: '<h4>Raw Parse</h4>'+commands.join('\n')
+			innerHTML: '<h4>Raw Parse</h4>'+json.stringify(commands)
 		}, 'output');
 		/*
 		domConstruct.create('pre', {

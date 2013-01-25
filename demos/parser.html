@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>jstcl Parser Test</title>
+        <script data-main="parser" src="js/require.js"></script>
+		<link rel="stylesheet" type="text/css" href="parser.css" />
+    </head>
+    <body>
+		Input script:
+		<button id="example1">Example1</button>
+		<button id="example2">Example2</button>
+		<br />
+		<textarea id="input_script" rows="10" cols="80"></textarea><br />
+		<input type="checkbox" id="deep_parse" />
+		<label for="deep_parse">Deep</label>
+		<button id="parse_script_button">Parse</button><span id="parse_feedback"></span>
+		<div id="result">
+			<div id="marked_up">
+				<div class="title">Marked-up source code</div>
+				<pre id="marked_up_display" class="output"></pre>
+			</div>
+			<div id="tokens">
+				<div class="title">Parsed tokens</div>
+				<pre id="tokens_display" class="output"></pre>
+			</div>
+		</div>
+    </body>
+</html>

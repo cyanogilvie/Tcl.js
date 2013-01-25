@@ -1,16 +1,16 @@
-/*jslint plusplus: true, white: true, continue: true */
+/*jshint eqnull:true */
 /*global define */
 
 define(['./types'], function(types){
 "use strict";
 
 var iface, e,
-	TXT		= 0,
+	TEXT	= 0,
 	SPACE	= 1,
 	VAR		= 2,
 	ARRAY	= 3,
 	INDEX	= 4,
-	EOL		= 5,
+	ESCAPE	= 5,
 	END		= 6,
 	SCRIPT	= 7,
 	COMMENT	= 8,
@@ -28,13 +28,15 @@ var iface, e,
 	ARG			= 20,
 	QUOTED		= 21,
 	BRACED		= 22,
+	SCRIPTARG	= 24,
+	EXPRARG		= 25,
 	t = {
-		TXT		: TXT,
+		TEXT	: TEXT,
 		SPACE	: SPACE,
 		VAR		: VAR,
 		ARRAY	: ARRAY,
 		INDEX	: INDEX,
-		EOL		: EOL,
+		ESCAPE	: ESCAPE,
 		END		: END,
 		SCRIPT	: SCRIPT,
 		COMMENT	: COMMENT,
@@ -52,7 +54,10 @@ var iface, e,
 		EXPR		: EXPR,
 		ARG			: ARG,
 		QUOTED		: QUOTED,
-		BRACED		: BRACED
+		BRACED		: BRACED,
+
+		SCRIPTARG	: SCRIPTARG,
+		EXPRARG		: EXPRARG
 	}, operators = [
 		/^[~!]/,			1,
 		/^\*\*/,			2,
@@ -78,96 +83,163 @@ function ParseError(message) {
 }
 ParseError.prototype = new Error();
 
-function parse(text, mode) {
-	var i = 0, word, token = '', tokens = [], lasttoken, command = [],
-		commands = [], matches;
+function word_empty(tokens) {
+	var i;
+	for (i=0; i<tokens.length; i++) {
+		switch (tokens[i][0]) {
+			case TEXT:
+			case ESCAPE:
+			case VAR:
+			case ARRAY:
+			//case INDEX:	// Can't have INDEX without ARRAY
+			case SCRIPT:
+			case EXPAND:
+				return false;
+		}
+	}
+	return true;
+}
 
-	function emit_waiting(type) {
-		if (token) {
-			tokens.push([type, token]);
-			token = '';
+
+function all_script_tokens(commands) {
+	var i, j, k, command, word, tokens=[];
+
+	for (i=0; i<commands.length; i++) {
+		command = commands[i];
+		for (j=0; j<command.length; j++) {
+			word = command[j];
+			for (k=0; k<word.length; k++) {
+				tokens.push(word[k]);
+			}
+		}
+	}
+	return tokens;
+}
+
+function parse(text, mode, ofs) {
+	var i = 0, word, token = '', tokens = [], lasttoken, command = [],
+		commands = [], matches, tokstart = (ofs != null ? ofs : 0);
+
+	function toklength(tok) {
+		var len, i, tokens;
+		switch (tok[0]) {
+			case INDEX:
+				len = 0;
+				for (i=0; i<tok[1].length; i++) {
+					len += toklength(tok[1][i]);
+				}
+				return len;
+
+			case SCRIPT:
+				tokens = all_script_tokens(tok[1]);
+				len = 0;
+				for (i=0; i<tokens.length; i++) {
+					len += toklength(tokens[i]);
+				}
+				return len;
+
+			default:
+				return tok[1].length;
 		}
 	}
 
 	function emit(tok) {
+		tok[3] = tokstart;
+		tokstart += toklength(tok);
 		tokens.push(tok);
 		token = '';
 	}
 
-	function parse_escape() {
-		var escapechars;
+	function emit_waiting(type) {
+		if (token) {emit([type, token]);}
+	}
 
-		i++;
-		switch (text[i]) {
+	function parse_escape() {
+		var escapechars, first = i++;
+
+		function literal(crep, len) {
+			var last = first + (len === undefined ? 1 : len);
+			emit_waiting(TEXT);
+			emit([ESCAPE, text.substr(first, last-first+1), crep]);
+			i = last+1;
+		}
+
+		function charcode(code, len) {
+			literal(String.fromCharCode(code), len);
+		}
+
+		switch (text[i++]) {
 			case undefined:
 				token += '\\';
 				break;
 
-			case 'a': token += String.fromCharCode(0x7); i++; break;
-			case 'b': token += String.fromCharCode(0x8); i++; break;
-			case 'f': token += String.fromCharCode(0xc); i++; break;
-			case 'n': token += String.fromCharCode(0xa); i++; break;
-			case 'r': token += String.fromCharCode(0xd); i++; break;
-			case 't': token += String.fromCharCode(0x9); i++; break;
-			case 'v': token += String.fromCharCode(0xb); i++; break;
+			case 'a': charcode(0x7); break;
+			case 'b': charcode(0x8); break;
+			case 'f': charcode(0xc); break;
+			case 'n': charcode(0xa); break;
+			case 'r': charcode(0xd); break;
+			case 't': charcode(0x9); break;
+			case 'v': charcode(0xb); break;
 
 			case 'x':
-				i++;
 				matches = text.substr(i).match(/^[0-9A-Fa-f]+/);
 				if (matches !== null) {
 					escapechars = matches[0];
-					token += String.fromCharCode(parseInt(escapechars, 16) % 0xff);
-					i += escapechars.length;
+					charcode(parseInt(escapechars, 16) % 0xff, escapechars.length+1);
 				} else {
-					token += 'x';
+					literal('x');
 				}
 				break;
 
 			case 'u':
-				i++;
 				matches = text.substr(i).match(/^[0-9A-Fa-f]{1,4}/);
 				if (matches !== null) {
 					escapechars = matches[0];
-					token += String.fromCharCode(parseInt(escapechars, 16));
-					i += escapechars.length;
+					charcode(parseInt(escapechars, 16), escapechars.length+1);
 				} else {
-					token += 'u';
+					literal('u');
 				}
+				break;
+
+			case '\n':
+				// Line folding
+				matches = text.substr(i).match(/^[ \t]*/);
+				literal(' ', matches !== null ? matches[0].length+1 : 1);
 				break;
 
 			default:
 				matches = text.substr(i).match(/^[0-7]{1,3}/);
 				if (matches !== null) {
 					escapechars = matches[0];
-					token += String.fromCharCode(parseInt(escapechars, 8));
-					i += escapechars.length;
+					charcode(parseInt(escapechars, 8), escapechars.length);
 				} else {
-					token += text[i++];
+					i--;
+					literal(text[i]);
 				}
 				break;
 		}
 	}
 
 	function parse_commands() {
-		var word, lasttoken, savetokens, command = [], commands = [];
-		emit_waiting(TXT);
+		var word, lasttoken, savetokens, savetokstart, command = [], commands = [];
+		emit_waiting(TEXT);
 		emit([SYNTAX, text[i++]]);
+		savetokstart = tokstart;
 		while (true) {
 			savetokens = tokens.slice();
 			word = get_word(command.length === 0, true);
 			tokens = savetokens;
 			command.push(word);
 			lasttoken = word[word.length-1];
-			if (lasttoken[0] === EOL) {
-				commands.push(command);
-				command = [];
-			}
 			if (lasttoken[0] === END) {
 				commands.push(command);
 				command = [];
-				break;
+				if (lasttoken[1] === ']' || lasttoken[1] === '') {
+					break;
+				}
 			}
 		}
+		tokstart = savetokstart;
 		emit([SCRIPT, commands]);
 	}
 
@@ -178,21 +250,23 @@ function parse(text, mode) {
 			token += text[i++];
 			return;
 		}
-		emit_waiting(TXT);
+		emit_waiting(TEXT);
 		emit([SYNTAX, text[i++]]);
 
 		function parse_index() {
-			var saved_tokens, indextokens;
+			var saved_tokens, saved_tokstart, indextokens;
 			// escape, variable and command substs apply here
 			emit([SYNTAX, text[i++]]);
 			saved_tokens = tokens.slice(0);
+			saved_tokstart = tokstart;
 			tokens = [];
 			while (true) {
 				switch (text[i]) {
 					case ')':
-						emit_waiting(TXT);
+						emit_waiting(TEXT);
 						indextokens = tokens.slice(0);
 						tokens = saved_tokens;
+						tokstart = saved_tokstart;
 						emit([INDEX, indextokens]);
 						emit([SYNTAX, text[i++]]);
 						return;
@@ -244,30 +318,51 @@ function parse(text, mode) {
 	}
 
 	function parse_braced() {
-		var idx, depth = 1, from;
+		var depth = 1, m, from, emitted = false;
 		emit([SYNTAX, text[i++]]);
 		from = i;
+
+		function emit_fold(len) {
+			emit([ESCAPE, text.substr(i, len), ' ']);
+			i += len;
+			from = i;
+		}
+
 		while (depth) {
-			idx = text.substr(i).search(/[{}]/);
-			if (idx === -1) {throw new ParseError('missing close-brace');}
-			i += idx;
-			if (text[i-1] !== '\\') {
-				if (text[i] === '{') {
+			m = text.substr(i).match(/(\\*?)?(?:(\{|\})|(\\\n[ \t]*))/);
+			if (m === null) {throw new ParseError('missing close-brace');}
+			if (m[1] !== undefined && m[1].length % 2 === 1) {
+				// The text we found was backquoted, move along
+				i += m.index + m[0].length;
+				continue;
+			}
+			i += m.index + (m[1] !== undefined ? m[1].length : 0);
+			if (m[3] !== undefined) {
+				// line fold
+				if (i > from) {
+					emit([TEXT, text.substr(from, i-from)]);
+				}
+				emit_fold(m[3].length);
+				emitted = true;
+			} else {
+				if (m[2].charAt(0) === '{') {
 					depth++;
 				} else {
 					depth--;
 				}
+				i++;
 			}
-			i++;
 		}
 		i--;
-		emit([TXT, text.substr(from, i-from)]);
+		if (!emitted || i>from) {
+			emit([TEXT, text.substr(from, i-from)]);
+		}
 		emit([SYNTAX, text[i++]]);
 		return tokens;
 	}
 
 	function parse_combined(quoted, incmdsubst, ignore_trailing) {
-		var matched;
+		var matched, start = i;
 
 		if (quoted) {
 			emit([SYNTAX, text[i++]]);
@@ -282,13 +377,17 @@ function parse(text, mode) {
 						throw new ParseError('missing "');
 
 					case '"':
-						if (!ignore_trailing && text[i+1] !== undefined && !/[\s;]/.test(text[i+1])) {
+						if (!ignore_trailing && text[i+1] !== undefined && !(incmdsubst ? /[\s;\]]/ : /[\s;]/).test(text[i+1])) {
 							throw new ParseError('extra characters after close-quote');
 						}
-						// Need to manually emit rather than using emit_waiting
-						// because we still need it if token === ''
-						tokens.push([TXT, token]);
-						token = '';
+						if (i === start + 1) {
+							// Need to manually emit rather than using
+							// emit_waiting because we still need it if
+							// token === ''
+							emit([TEXT, token]);
+						} else {
+							emit_waiting(TEXT);
+						}
 						emit([SYNTAX, text[i++]]);
 						return tokens;
 
@@ -297,20 +396,26 @@ function parse(text, mode) {
 			} else {
 				switch (text[i]) {
 					case undefined:
-						emit_waiting(TXT);
+						emit_waiting(TEXT);
 						emit([END, '']);
 						return tokens;
 
 					case '\n':
 					case ';':
-						emit_waiting(TXT);
+						emit_waiting(TEXT);
 						token = text[i++];
-						emit([EOL, token]);
+						emit([END, token]);
 						return tokens;
 
+					case '\\':
+						if (text[i+1] !== '\n') {
+							matched = false;
+							break;
+						}
+						// Line fold - falls through
 					case ' ':
 					case '\t':
-						emit_waiting(TXT);
+						emit_waiting(TEXT);
 						return tokens;
 
 					default: matched = false;
@@ -333,7 +438,7 @@ function parse(text, mode) {
 
 					case ']':
 						if (incmdsubst) {
-							emit_waiting(TXT);
+							emit_waiting(TEXT);
 							token = text[i++];
 							emit([END, token]);
 							return tokens;
@@ -348,21 +453,34 @@ function parse(text, mode) {
 	}
 
 	function get_word(first, incmdsubst) {
-		var re;
+		var re, m;
 
 		tokens = [];
 		token = '';
-		re = first ? /[\t #]/ : /[\t ]/;
+		re = first ?
+			/^(?:[\t \n]*\\\n[\t \n]*)|^[\t \n]+/ :
+			/^(?:[\t ]*\\\n[\t ]*)|^[\t ]+/;
 
 		// Consume any leading whitespace / comments if first word
-		while (re.test(text[i])) {
-			while (/[\t ]/.test(text[i])) {
-				token += text[i++];
+		while (
+			text[i] === '#' ||
+			(m = re.exec(text.substr(i)))
+		) {
+			if (m) {
+				token += m[0];
+				i += m[0].length;
 			}
 			emit_waiting(SPACE);
 			if (first && text[i] === '#') {
-				while (text[i] !== undefined && text[i] !== '\n') {
+				while (text[i] !== undefined) {
+					if (text[i] === '\\' && i < text.length-1) {
+						token += text[i++];
+					}
 					token += text[i++];
+					if (text[i] === '\n') {
+						token += text[i++];
+						break;
+					}
 				}
 				emit([COMMENT, token]);
 			}
@@ -375,7 +493,7 @@ function parse(text, mode) {
 		}
 
 		switch (text[i]) {
-			case undefined:	emit([END, '']); return tokens;
+			case undefined:	return tokens;
 			case '{':		return parse_braced();
 			case '"':		return parse_combined(true, incmdsubst);
 			case ']':
@@ -521,7 +639,7 @@ function parse(text, mode) {
 								case ARRAY: array = tokens[i][1]; break;
 								case INDEX:
 									index = tokens[i][1];
-									if (index.length === 1 && index[0][0] === TXT) {
+									if (index.length === 1 && index[0][0] === TEXT) {
 										// Optimize the common case where the
 										// index is a simple string
 										return [array, index[0][1]];
@@ -586,20 +704,25 @@ function parse(text, mode) {
 
 	switch (mode) {
 		case 'script':
-			while (true) {
+			while (i<text.length) {
 				word = get_word(command.length === 0, false);
-				command.push(word);
+				if (i >= text.length && word.length && word[word.length-1][0] !== END) {
+					word.push([END, '', null, i]);
+				}
+				if (command.length>1 && word_empty(word)) {
+					// Prevent a fake word being added to the command only
+					// containing non-word tokens
+					Array.prototype.push.apply(command[command.length-1], word);
+				} else {
+					command.push(word);
+				}
 				lasttoken = word[word.length-1];
-				if (lasttoken[0] === EOL) {
+				if (lasttoken[0] === END) {
 					commands.push(command);
 					command = [];
-				} else if (lasttoken[0] === END) {
-					commands.push(command);
-					command = [];
-					break;
 				}
 			}
-			return [SCRIPT, commands];
+			return [SCRIPT, commands, undefined, 0];
 		case 'expr':
 			parse_subexpr();
 			return tokens;
@@ -608,14 +731,15 @@ function parse(text, mode) {
 	}
 }
 
-function parse_script(text) {
+function parse_script(text, ofs) {
 	// First unfold - happens even in brace quoted words
-	text = text.replace(/\\\n\s*/g, ' ');
-	return parse(text, 'script');
+	// This has been pushed down to parse_escape and parse_braced
+	//text = text.replace(/\\\n\s*/g, ' ');
+	return parse(text, 'script', ofs);
 }
 
-function parse_expr(text) {
-	return parse(text, 'expr');
+function parse_expr(text, ofs) {
+	return parse(text, 'expr', ofs);
 }
 
 function expr2stack(expr) {

@@ -47,13 +47,14 @@ require([
 					}, tnode), false);
 				} else {
 					classname = 'tok tok_'+parser.tokenname[token[0]];
-					if (isscript && token[0] === parser.TXT && first) {
+					if (isscript && token[0] === parser.TEXT && first) {
 						classname += ' tok_commandname';
 						first = false;
 					}
 					domConstruct.create('span', {
 						className: classname,
-						innerHTML: token[1]
+						innerHTML: token[1],
+						title: parser.tokenname[token[0]] + (token[2] !== undefined ? ': "'+token[2]+'"' : '')
 					}, tnode);
 				}
 			}

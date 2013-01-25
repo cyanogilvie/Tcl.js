@@ -366,8 +366,12 @@ return function(/* extensions... */){
 						expand = true;
 						break;
 
-					case parser.TXT:
+					case parser.TEXT:
 						parts.push(new StringObj(token[1]));
+						break;
+
+					case parser.ESCAPE:
+						parts.push(new StringObj(token[2]));
 						break;
 
 					case parser.VAR:
@@ -491,9 +495,14 @@ return function(/* extensions... */){
 						expand = true;
 						break;
 
-					case parser.TXT:
+					case parser.TEXT:
 						word.push(constant_op(token[1]));
 						if (constant) {constval += token[1];}
+						break;
+
+					case parser.ESCAPE:
+						word.push(constant_op(token[2]));
+						if (constant) {constval += token[2];}
 						break;
 
 					case parser.VAR:
@@ -964,8 +973,12 @@ return function(/* extensions... */){
 		for (i=0; i<tokens.length; i++) {
 			token = tokens[i];
 			switch (token[0]) {
-				case parser.TXT:
+				case parser.TEXT:
 					if (constant) {constval += token[1];}
+					break;
+
+				case parser.ESCAPE:
+					if (constant) {constval += token[2];}
 					break;
 
 				case parser.EXPAND:

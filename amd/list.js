@@ -2,11 +2,9 @@
 /*jslint nomen: true, plusplus: true, white: true, browser: true, node: true, newcap: true, continue: true */
 
 define([
-	'./types',
-	'./utils'
+	'./types'
 ], function(
-	types,
-	utils
+	types
 ){
 "use strict";
 
@@ -569,38 +567,6 @@ function complete(str) { //<<<
 }
 
 //>>>
-function bool(str) { //<<<
-	var m, num;
-	function err(){
-		throw new Error('invalid boolean value "'+str+'"');
-	}
-	switch (typeof str) {
-		case 'boolean': return str;
-		case 'number': return !isNaN(str) && str !== 0;
-		case 'object':
-			if (str instanceof types.TclObject) {
-				return str.GetBool();
-			}
-			str = str.toString();
-		case 'string':
-			if (m = /^(t(?:r(?:ue?)?)?|y(?:es?)?|on)/i.exec(str)) {
-				if (m[0].length !== str.length) {err();}
-				return true;
-			}
-			if (m = /^(0|f(?:a(?:l(?:se?)?)?)?|no?|off?)/i.exec(str)) {
-				if (m[0].length !== str.length) {err();}
-				return false;
-			}
-
-			num = utils.to_number(str);
-			if (isNaN(num)) {err();}
-			return num !== 0;
-		default:
-			err();
-	}
-}
-
-//>>>
 
 return {
 	list2array:			parse_tcl_list,
@@ -612,7 +578,7 @@ return {
 	dict2list:			dict2list,
 	to_tcl:				to_tcl,
 	complete:			complete,
-	bool:				bool
+	bool:				function(){throw new Error('bool() has moved to utils');}
 };
 
 });

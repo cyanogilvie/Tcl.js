@@ -4,7 +4,7 @@
 define([
 	'./parser',
 	'./tclobject',
-	'./list',
+	'./utils',
 	'./types',
 	'./objtype_list',
 	'./objtype_script',
@@ -15,7 +15,7 @@ define([
 ], function(
 	parser,
 	tclobj,
-	list,
+	utils,
 	types,
 	ListObj,
 	ScriptObj,
@@ -733,7 +733,7 @@ return function(/* extensions... */){
 		atan: 'atan',
 		atan2: 'atan2',
 		bool: {args: [1, 1],
-			handler: function(args) {return [OPERAND, BOOL, list.bool(args[0])];}
+			handler: function(args) {return [OPERAND, BOOL, utils.bool(args[0])];}
 		},
 		ceil: 'ceil',
 		cos: 'cos',
@@ -795,7 +795,7 @@ return function(/* extensions... */){
 	};
 	mathops = {
 		1: {
-			'!': function(a) {return !list.bool(a);},
+			'!': function(a) {return !utils.bool(a);},
 			'~': '~',
 			'-': '-',
 			'+': function(a) {return a;}
@@ -813,18 +813,18 @@ return function(/* extensions... */){
 				compiler: function(args){
 					var f, a=args[0], b=args[1];
 					if (a.constant) {
-						return list.bool(a()) ? a : b;
+						return utils.bool(a()) ? a : b;
 					}
 					if (a.async) {
 						f = b.async ?
 							function(c){
 								return a(function(v){
-									return list.bool(v) ? c(v) : b(c);
+									return utils.bool(v) ? c(v) : b(c);
 								});
 							} :
 							function(c){
 								return a(function(v){
-									return list.bool(v) ? c(v) : c(b());
+									return utils.bool(v) ? c(v) : c(b());
 								});
 							};
 						f.async = true;
@@ -833,11 +833,11 @@ return function(/* extensions... */){
 					f = b.async ?
 						function(c){
 							var v = a();
-							return list.bool(v) ? c(v) : b(c);
+							return utils.bool(v) ? c(v) : b(c);
 						} :
 						function(){
 							var v = a();
-							return list.bool(v) ? v : b();
+							return utils.bool(v) ? v : b();
 						};
 					f.async = b.async;
 					return f;
@@ -847,18 +847,18 @@ return function(/* extensions... */){
 				compiler: function(args){
 					var f, a=args[0], b=args[1];
 					if (a.constant) {
-						return list.bool(a()) ? b : a;
+						return utils.bool(a()) ? b : a;
 					}
 					if (a.async) {
 						f = b.async ?
 							function(c){
 								return a(function(v){
-									return list.bool(v) ? b(c) : c(v);
+									return utils.bool(v) ? b(c) : c(v);
 								});
 							} :
 							function(c){
 								return a(function(v){
-									return list.bool(v) ? c(b()) : c(v);
+									return utils.bool(v) ? c(b()) : c(v);
 								});
 							};
 						f.async = true;
@@ -867,11 +867,11 @@ return function(/* extensions... */){
 					f = b.async ?
 						function(c){
 							var v = a();
-							return list.bool(v) ? b(c) : c(v);
+							return utils.bool(v) ? b(c) : c(v);
 						} :
 						function(){
 							var v = a();
-							return list.bool(v) ? b() : v;
+							return utils.bool(v) ? b() : v;
 						};
 					f.async = b.async;
 					return f;
@@ -915,12 +915,12 @@ return function(/* extensions... */){
 				compiler: function(args){
 					var f, t=args[0], a=args[1], b=args[2];
 					if (t.constant) {
-						return list.bool(t()) ? a : b;
+						return utils.bool(t()) ? a : b;
 					}
 					if (t.async) {
 						f = function(c){
 							return t(function(v){
-								return list.bool(v) ?
+								return utils.bool(v) ?
 									(a.async ? a(c) : c(a())) :
 									(b.async ? b(c) : c(b()));
 							});
@@ -929,7 +929,7 @@ return function(/* extensions... */){
 						return f;
 					} else if (a.async || b.async) {
 						f = function(c){
-							return list.bool(t()) ?
+							return utils.bool(t()) ?
 								(a.async ? a(c) : c(a())) :
 								(b.async ? b(c) : c(b()));
 						};
@@ -937,7 +937,7 @@ return function(/* extensions... */){
 						return f;
 					} else {
 						return function(){
-							return list.bool(t()) ? a() : b();
+							return utils.bool(t()) ? a() : b();
 						};
 					}
 				}

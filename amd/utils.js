@@ -119,6 +119,37 @@ var TclError = types.TclError, utils = {
 		err();
 	},
 
+	bool: function(str) {
+		var m, num;
+		function err(){
+			throw new Error('invalid boolean value "'+str+'"');
+		}
+		switch (typeof str) {
+			case 'boolean': return str;
+			case 'number': return !isNaN(str) && str !== 0;
+			case 'object':
+				if (str instanceof types.TclObject) {
+					return str.GetBool();
+				}
+				str = str.toString();
+			case 'string':
+				if (m = /^(t(?:r(?:ue?)?)?|y(?:es?)?|on)/i.exec(str)) {
+					if (m[0].length !== str.length) {err();}
+					return true;
+				}
+				if (m = /^(0|f(?:a(?:l(?:se?)?)?)?|no?|off?)/i.exec(str)) {
+					if (m[0].length !== str.length) {err();}
+					return false;
+				}
+
+				num = utils.to_number(str);
+				if (isNaN(num)) {err();}
+				return num !== 0;
+			default:
+				err();
+		}
+	},
+
 	not_implemented: function(){
 		throw new types.TclError('Not implemented yet', ['TCL', 'NOT_IMPLEMENTED']);
 	}

@@ -4,7 +4,6 @@
 define([
 	'./types',
 	'./utils',
-	'./list',
 	'./objtype_bool',
 	'./objtype_dict',
 	'./objtype_list',
@@ -12,7 +11,6 @@ define([
 ], function(
 	types,
 	utils,
-	list,
 	BoolObj,
 	DictObj,
 	ListObj,
@@ -288,7 +286,7 @@ function install(interp){
 				if (res.code !== types.OK) {return c(res);}
 				return function loop(){
 					return test(function(v){
-						if (!list.bool(v)) return c();
+						if (!utils.bool(v)) return c();
 						return interp.exec(body, function(res){
 							switch (res.code) {
 								case types.CONTINUE:
@@ -310,7 +308,7 @@ function install(interp){
 			return interp.exec(start, function(res){
 				if (res.code !== types.OK) {return c(res);}
 				return function loop(){
-					if (!list.bool(test())) return c();
+					if (!utils.bool(test())) return c();
 					return interp.exec(body, function(res){
 						switch (res.code) {
 							case types.CONTINUE:

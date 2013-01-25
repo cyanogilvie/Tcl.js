@@ -83,6 +83,10 @@ var dom = {
 
 	byId: function(id){
 		return document.getElementById(id);
+	},
+
+	head: function(){
+		return document.getElementsByTagName('head')[0];
 	}
 };
 

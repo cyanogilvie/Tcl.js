@@ -2,7 +2,7 @@
 <html>
     <head>
         <meta charset="utf-8" />
-        <title>jstcl Parser Test</title>
+        <title>Tcl.js Parser Test</title>
         <script data-main="parser" src="js/require.js"></script>
 		<link rel="stylesheet" type="text/css" href="parser.css" />
     </head>
@@ -12,7 +12,7 @@
 		<button id="example2">Example2</button>
 		<br />
 		<textarea id="input_script" rows="10" cols="80"></textarea><br />
-		<input type="checkbox" id="deep_parse" />
+		<input type="checkbox" id="deep_parse" title="Use command hinters to guess at which arguments will be interpreted as scripts or expressions, and parse them recursively" />
 		<label for="deep_parse">Deep</label>
 		<button id="parse_script_button">Parse</button><span id="parse_feedback"></span>
 		<div id="result">
@@ -21,7 +21,7 @@
 				<pre id="marked_up_display" class="output"></pre>
 			</div>
 			<div id="tokens">
-				<div class="title">Parsed tokens</div>
+				<div class="title">Parsed tokens <input type="checkbox" id="hide_noise" title="Only display the tokens that matter to execution" /><label for="hide_noise">Hide noise tokens</label></div>
 				<pre id="tokens_display" class="output"></pre>
 			</div>
 		</div>

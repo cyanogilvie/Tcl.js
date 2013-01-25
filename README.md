@@ -36,7 +36,7 @@ HTML:
 <html>
 	<head>
 		<meta charset="utf-8" />
-		<title>jstcl</title>
+		<title>Tcl.js</title>
 		<script data-main="main" src="require.js"></script>
 	</head>
 	<body>
@@ -84,7 +84,7 @@ With `nop` implemented in native Tcl as:
 proc nop args {}
 ```
 
-and in jstcl as:
+and in Tcl.js as:
 
 ```javascript
 var I = Interp();
@@ -95,7 +95,7 @@ The timings are as follows (on my MacBook Air with a Core i5 @ 1.8GHz):
 
 * Native Tcl 8.6, not in bytecoded context: 7765 microseconds per iteration
 * Native Tcl 8.6, in bytecoded context (using `apply`): 6508 microseconds per iteration
-* jstcl (bytecode context N/A) on V8 (Google Chrome 24): 21225 microseconds per iteration
+* Tcl.js (bytecode context N/A) on V8 (Google Chrome 24): 21225 microseconds per iteration
 
 So it's around 3 times slower than the c interpreter on this benchmark.
 On other browsers it's a very different story unfortunately.  Safari clocks in at about 68000 microseconds, and Firefox (v18.0.1 - with the shiny new IonMonkey engine) managages 140599 microseconds.  I haven't the stomach (or the platform) to test IE.
@@ -103,7 +103,7 @@ On other browsers it's a very different story unfortunately.  Safari clocks in a
 What Is The License?
 --------------------
 
-jstcl is copyright Cyan Ogilvie, and licensed under the same terms as Tcl.  (BSD-ish)
+Tcl.js is copyright Cyan Ogilvie, and licensed under the same terms as Tcl.  (BSD-ish)
 
 Why Are All The Headings Questions?
 -----------------------------------

@@ -20,6 +20,7 @@ require([
 var EXPRARG = parser.EXPRARG,
 	SCRIPTARG = parser.SCRIPTARG,
 	marked_up_parent,
+	dynStyleNode = dom.create('style', {type: 'text/css'}, dom.head()),
 	cmd_parse_info = {
 	'if': function(words){
 		var special = [
@@ -80,10 +81,6 @@ function real_words(words) {
 		}
 	}
 	return realwords;
-}
-
-function last_word(words) {
-	return words.length-1;
 }
 
 function get_text(word, raw) {
@@ -203,7 +200,8 @@ function tokname(type) {
 }
 
 function display_token(token, parent) {
-	var i, j, k, type = token[0], node, subnode, commands, command, word, cNode, wNode;
+	var i, j, k, type = token[0], node, subnode, commands, command, word,
+		cNode, wNode, attribs = {};
 
 	switch (type) {
 		case parser.SCRIPTARG:
@@ -275,16 +273,18 @@ function display_token(token, parent) {
 			]);
 			break;
 
-		case parser.TEXT:
+		case parser.COMMENT:
+		case parser.SYNTAX:
 		case parser.SPACE:
+		case parser.END:
+			attribs = {className: 'noise'};
+			// Falls through
+		case parser.TEXT:
 		case parser.VAR:
 		case parser.ARRAY:
-		case parser.END:
-		case parser.COMMENT:
 		case parser.EXPAND:
-		case parser.SYNTAX:
 		case parser.ESCAPE:
-			dom.create('div', {}, parent, [
+			dom.create('div', attribs, parent, [
 				'[',
 				tokname(type),
 				', ',
@@ -335,9 +335,16 @@ function load_script(script) {
 	parse_script();
 }
 
-//load_script(example1);
+function configure_noise(){
+	dom.innerText(dynStyleNode, dom.byId('hide_noise').checked ? '.noise {display: none;}' : '');
+}
+
+load_script(example1);
 
 dom.onclick('example1', function(){load_script(example1);});
 dom.onclick('example2', function(){load_script(example2);});
 dom.onclick('parse_script_button', parse_script);
+dom.byId('hide_noise').onchange = configure_noise;
+dom.byId('deep_parse').onchange = parse_script;
+configure_noise();
 });

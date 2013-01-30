@@ -156,7 +156,13 @@ function deep_parse(script_tok) {
 					break;
 
 				case EXPRARG:
-					// TODO
+					ofs = word_start(command[k]);
+					command[k] = replace_static(command[k], [
+						EXPRARG,
+						command[k].slice(),
+						parser.parse_expr(txt, ofs),
+						ofs
+					]);
 					break;
 			}
 		}
@@ -201,7 +207,7 @@ function tokname(type) {
 
 function display_token(token, parent) {
 	var i, j, k, type = token[0], node, subnode, commands, command, word,
-		cNode, wNode, attribs = {};
+		cNode, wNode, tNode, attribs = {};
 
 	switch (type) {
 		case parser.SCRIPTARG:
@@ -234,8 +240,9 @@ function display_token(token, parent) {
 						dom.create('span', {className: 'commandMarker'}, null,
 							'Word --------------------------------')
 					);
+					tNode = dom.create('div', {style: {marginLeft: '2em'}}, wNode);
 					for (k=0; k<word.length; k++) {
-						display_token(word[k], dom.create('div', {style: {marginLeft: '2em'}}, wNode));
+						display_token(word[k], tNode);
 					}
 					if (j === 0) {
 						marked_up_parent.pop();
@@ -245,31 +252,34 @@ function display_token(token, parent) {
 					marked_up_parent.pop();
 				}
 			}
-			dom.appendText(node, [
-				markup_tok_element(token[2]),
-				', ',
-				markup_tok_element(token[3]),
-				']'
+			dom.appendText(node, [', ',
+				markup_tok_element(token[2]), ', ',
+				markup_tok_element(token[3]), ']'
 			]);
 			break;
 
 		case parser.INDEX:
-			node = dom.create('div', {}, parent, [
-				'[',
-				tokname(type),
-				', '
-			]);
+			node = dom.create('div', {}, parent, '['+tokname(type)+', ');
 			push_marked_up_parent({className: 'tok_INDEX'});
 			subnode = dom.create('div', {style: {marginLeft: '2em'}}, node);
 			for (i=0; i<token[1].length; i++) {
 				display_token(token[1][i], subnode);
 			}
 			marked_up_parent.pop();
+			dom.appendText(node, [', ',
+				markup_tok_element(token[2]), ', ',
+				markup_tok_element(token[3]), ']'
+			]);
+			break;
+
+		case parser.EXPRARG:
+			node = dom.create('div', {}, parent, '['+tokname(type)+', ');
+			subnode = dom.create('div', {style: {marginLeft: '2em'}}, node);
+			for (i=0; i<token[2].length; i++) {
+				display_expr_token(token[2][i], subnode);
+			}
 			dom.appendText(node, [
-				markup_tok_element(token[2]),
-				', ',
-				markup_tok_element(token[3]),
-				']'
+				markup_tok_element(token[3]), ']'
 			]);
 			break;
 
@@ -285,21 +295,118 @@ function display_token(token, parent) {
 		case parser.EXPAND:
 		case parser.ESCAPE:
 			dom.create('div', attribs, parent, [
-				'[',
-				tokname(type),
-				', ',
-				markup_tok_element(token[1]),
-				', ',
-				markup_tok_element(token[2]),
-				', ',
-				markup_tok_element(token[3]),
-				']'
+				'['+tokname(type)+', ',
+				markup_tok_element(token[1]), ', ',
+				markup_tok_element(token[2]), ', ',
+				markup_tok_element(token[3]), ']'
 			]);
 			dom.create('span', {className: 'tok tok_'+tokname(type)}, marked_up_parent[marked_up_parent.length-1], token[1]);
 			break;
 
 		default:
 			console.warn('Unhandled token type: '+type+', "'+parser[type]+'"');
+	}
+}
+
+function display_expr_token(token, parent) {
+	var markup_node = marked_up_parent[marked_up_parent.length-1], opNode;
+
+	switch (token[0]) {
+		case parser.OPERAND: operand(); break;
+		case parser.OPERATOR: operator(); break;
+		case parser.SPACE:
+		case parser.SYNTAX: syntax(); break;
+		default:
+			throw new Error('Unexpected expr token type: '+token[1]+' ('+tokname(token[1])+')');
+	}
+
+	function operand() {
+		var tNode, i;
+
+		opNode = dom.create('div', {}, parent, [
+			'['+tokname(token[0])+', '+
+			tokname(token[1])+', ',
+		]);
+
+		switch (token[1]) {
+			case parser.SCRIPT:	script(); break;
+			case parser.VAR:	variable(); break;
+			case parser.LPAREN:
+			case parser.RPAREN:	syntax(); break;
+			case parser.FLOAT:
+			case parser.INTEGER:
+			case parser.BOOL:	literal(); break;
+			case parser.QUOTED:
+			case parser.BRACED:
+				tNode = dom.create('div', {style: {marginLeft: '2em'}}, parent);
+				for (i=0; i<token[2].length; i++) {
+					display_token(token[2][i], tNode);
+				}
+				break;
+			default:
+				/*
+				MATHFUNC	= 17,
+				EXPR		= 19,
+				ARG			= 20,
+				*/
+				//debugger;
+				dom.appendText(opNode, '<crep placeholder>');
+				dom.create('span', {}, markup_node, token[3]);
+				break;
+		}
+
+		dom.appendText(opNode, [
+			', ', markup_tok_element(token[3]), ']'
+		]);
+
+		function literal() {
+			dom.appendText(opNode, markup_tok_element(token[2]));
+			dom.create('span', {className: 'tok tok_'+tokname(token[1])}, markup_node, token[3]);
+		}
+
+		function script() {
+			display_token(token[2], dom.create('div', {style: {marginLeft: '2em'}}, opNode));
+		}
+
+		function variable() {
+			if (token[2].length === 1) {
+				dom.appendText(opNode,
+					markup_tok_element(token[2][0])
+				);
+			} else {
+				dom.appendText(opNode, [
+					markup_tok_element(token[2][0]),
+					'('
+				]);
+				if (typeof token[2][1] === 'string') {
+					dom.appendText(opNode, markup_tok_element(token[2][1]));
+				} else {
+					dom.appendText(opNode, '<index placeholder>');
+				}
+				dom.appendText(opNode, ')');
+			}
+			dom.create('span', {className: 'tok tok_' + token[2].length === 1 ? 'VAR' : 'ARRAY'}, markup_node, token[3]);
+		}
+	}
+
+	function operator() {
+		dom.create('div', {}, parent, [
+			'['+tokname(token[0])+', ',
+			'precedence:', markup_tok_element(token[1]), ', ',
+			'args:', markup_tok_element(token[2]), ', ',
+			markup_tok_element(token[3]), ']'
+		]);
+		dom.create('span', {className: 'tok tok_OPERATOR'}, markup_node, token[3]);
+	}
+
+	function syntax() {
+		dom.create('div', {className: 'noise'}, parent, [
+			'['+tokname(token[0])+', ',
+			markup_tok_element(token[1]), ', ',
+			markup_tok_element(token[2]), ', ',
+			markup_tok_element(token[3]), ']'
+		]);
+		dom.create('span', {className: 'tok tok_SYNTAX'}, marked_up_parent[marked_up_parent.length-1], token[3]);
 	}
 }
 

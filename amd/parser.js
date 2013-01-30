@@ -65,7 +65,7 @@ var iface, e,
 		/^[\-+]/,			2,
 		/^(?:<<|>>)/,		2,
 		/^(?:<=|>=)/,		2,
-		/^(?:<|>)/,			2,	// Technically the same precidence as above, but the above needs to be matched against first
+		/^(?:<|>)/,			2,	// Technically the same precedence as above, but the above needs to be matched against first
 		/^(?:==|!=)/,		2,
 		/^(?:ne|eq)/,		2,
 		/^(?:in|ni)/,		2,
@@ -221,7 +221,8 @@ function parse(text, mode, ofs) {
 	}
 
 	function parse_commands() {
-		var word, lasttoken, savetokens, savetokstart, command = [], commands = [];
+		var word, lasttoken, savetokens, savetokstart, command=[], commands=[];
+
 		emit_waiting(TEXT);
 		emit([SYNTAX, text[i++]]);
 		savetokstart = tokstart;
@@ -525,18 +526,22 @@ function parse(text, mode, ofs) {
 		}
 
 		function sub_parse(subtoken, func, make_crep) {
-			var s_tokens = tokens.slice(), s_i = i, e_i, crep;
+			var s_tokens = tokens.slice(),
+				s_tokstart = tokstart,
+				s_i = i, e_i, crep, subtokens;
 			tokens = [];
 			func();
-			crep = make_crep ? make_crep(tokens) : tokens;
-			tokens = s_tokens;
+			subtokens = tokens.slice();
 			e_i = i;
+			tokens = s_tokens;
+			tokstart = s_tokstart;
 			i = s_i;
+			crep = make_crep ? make_crep(subtokens) : subtokens;
 			emit_token(OPERAND, text.substr(i, e_i-i), subtoken, crep);
 		}
 
 		function sub_parse_arg() {
-			var s_tokens = tokens.slice(), s_i = i, e_i, subtokens;
+			var s_tokens=tokens.slice(), s_i=i, e_i, subtokens;
 			tokens = [];
 			parse_subexpr(true);
 			subtokens = tokens;
@@ -649,7 +654,7 @@ function parse(text, mode, ofs) {
 									}
 							}
 						}
-						throw new Error('No script found');
+						throw new Error('No variable found');
 					});
 					continue;
 				case '[':
@@ -658,6 +663,9 @@ function parse(text, mode, ofs) {
 						for (i=0; i<tokens.length; i++) {
 							if (tokens[i][0] === SCRIPT) {
 								return tokens[i];
+							} else if (tokens[i][0] === SYNTAX) {
+								// Dirty hack to inject the [ syntax token
+								emit_token(SYNTAX, tokens[i][1]);
 							}
 						}
 						throw new Error('No script found');

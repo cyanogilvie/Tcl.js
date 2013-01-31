@@ -70,16 +70,16 @@ function install(interp) {
 		});
 	});
 
-	interp.registerCommand('expr', function(args){
+	interp.registerAsyncCommand('expr', function(c, args){
 		interp.checkArgs(args, [1, null], 'arg ?arg ...?');
 		if (args.length === 2) {
-			return interp.TclExpr(args[1]);
+			return interp._TclExpr(args[1], c);
 		}
 		var i, str_args = [];
 		for (i=1; i<args.length; i++) {
 			str_args.push(args.toString());
 		}
-		return interp.TclExpr(str_args.join(' '));
+		return interp._TclExpr(str_args.join(' '), c);
 	});
 
 	interp.registerCommand('incr', function(args){

@@ -50,7 +50,7 @@ function install(interp) {
 	});
 
 	interp.registerCommand('split', function(args){
-		interp.checkArgs(args, 1, 'string ?splitChars?');
+		interp.checkArgs(args, [1, 2], 'string ?splitChars?');
 		var re = args[2] === undefined ?
 			/\s/ :
 			new RegExp('['+utils.escape_regex(args[2])+']');
@@ -58,7 +58,7 @@ function install(interp) {
 	});
 
 	interp.registerCommand('join', function(args){
-		interp.checkArgs(args, 1, 'list ?joinString?');
+		interp.checkArgs(args, [1, 2], 'list ?joinString?');
 		var list = args[1].GetList(),
 			joinString = args[2] === undefined ? ' ':args[2].toString();
 		return new ListObj(list.join(joinString));

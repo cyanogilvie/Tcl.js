@@ -1329,6 +1329,11 @@ return function(/* extensions... */){
 			switch (thisP[0]) {
 				case OPERAND: stack.push(operand2func(thisP)); break;
 				case OPERATOR:
+					if (thisP[3] === ':') {
+						// Hack around the expr ? val : val syntax
+						//stack.pop();
+						break
+					}
 					numargs = thisP[2];
 					args = stack.splice(-numargs, numargs);
 					stack.push(operator2func(thisP[3], args));

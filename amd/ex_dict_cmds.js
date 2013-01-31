@@ -150,7 +150,7 @@ subcmds = {
 				return I.exec(body, function(res){
 					switch (res.code) {
 						case types.OK:			
-							if (tcllist.bool(res.result.toString())) {
+							if (utils.bool(res.result.toString())) {
 								outdictvals[k] = dictvals[k];
 								outdictvals[k].IncrRefCount();
 							}
@@ -215,7 +215,7 @@ subcmds = {
 
 			I.set_scalar(keyvar, k);
 			I.set_scalar(valuevar, v);
-			I.exec(body, function(res){
+			return I.exec(body, function(res){
 				switch (res.code) {
 					case types.CONTINUE:
 					case types.OK:			return next_loop;
@@ -318,7 +318,7 @@ subcmds = {
 				v = pairs[i++];
 			I.set_scalar(keyvar, k);
 			I.set_scalar(valuevar, v);
-			I.exec(body, function(res){
+			return I.exec(body, function(res){
 				switch (res.code) {
 					case types.OK:
 						accum.push(res.result);

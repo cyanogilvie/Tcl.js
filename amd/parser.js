@@ -208,12 +208,12 @@ function parse(text, mode, ofs) {
 				break;
 
 			default:
+				i--;
 				matches = text.substr(i).match(/^[0-7]{1,3}/);
 				if (matches !== null) {
 					escapechars = matches[0];
 					charcode(parseInt(escapechars, 8), escapechars.length);
 				} else {
-					i--;
 					literal(text[i]);
 				}
 				break;

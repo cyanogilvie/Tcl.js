@@ -4,11 +4,11 @@
 define([
 	'./tclobject',
 	'./types',
-	'./list'
+	'./utils'
 ], function(
 	tclobj,
 	types,
-	tcllist
+	utils
 ){
 'use strict';
 
@@ -32,17 +32,17 @@ var boolhandlers = {
 					obj.jsval = obj.jsval !== 0;
 					break;
 				case 'string':
-					obj.jsval = tcllist.bool(obj.jsval);
+					obj.jsval = utils.bool(obj.jsval);
 					break;
 				default:
-					obj.jsval = tcllist.bool(obj.toString());
+					obj.jsval = utils.bool(obj.toString());
 			}
 			return;
 		}
 		if (obj.handlers.type === 'int') {
 			newjsval = obj.GetInt() !== 0;
 		} else {
-			newjsval = tcllist.bool(obj.toString());
+			newjsval = utils.bool(obj.toString());
 		}
 		obj.FreeJsVal();
 		obj.jsval = newjsval;
@@ -65,7 +65,7 @@ function any2bool(value) {
 	switch (typeof value) {
 		case 'boolean':	return value;
 		case 'number':	return !isNaN(value) && value !== 0;
-		case 'string':	return tcllist.bool(value);
+		case 'string':	return utils.bool(value);
 		default:		throw new Error('invalid boolean value "'+value+'"');
 	}
 }

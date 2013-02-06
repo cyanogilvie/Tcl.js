@@ -1332,7 +1332,7 @@ return function(/* extensions... */){
 					if (thisP[3] === ':') {
 						// Hack around the expr ? val : val syntax
 						//stack.pop();
-						break
+						break;
 					}
 					numargs = thisP[2];
 					args = stack.splice(-numargs, numargs);

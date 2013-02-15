@@ -3,7 +3,8 @@
 define(function(){
 'use strict';
 
-var iface, objtypes = {}, TclObjectBase, jsvalhandlers, NewObj;
+var iface, objtypes = {}, TclObjectBase, jsvalhandlers, NewObj,
+	pendingFree=[], freeTimeout;
 
 jsvalhandlers = {
 	type: 'jsval',
@@ -24,6 +25,17 @@ jsvalhandlers = {
 	}
 };
 
+function freeObjs() {
+	var obj;
+	freeTimeout = null;
+	while (pendingFree.length > 0) {
+		obj = pendingFree.pop();
+		if (obj.refCount <= 0) {
+			obj.FreeJsVal();
+		}
+	}
+}
+
 TclObjectBase = {
 	_init: function(){
 		this.refCount = 0;
@@ -36,7 +48,10 @@ TclObjectBase = {
 	},
 	DecrRefCount: function(){
 		if (--this.refCount <= 0) {
-			this.FreeJsVal();
+			pendingFree.push(this);
+			if (freeTimeout == null) {
+				freeTimeout = setTimeout(freeObjs, 0);
+			}
 		}
 	},
 	FreeJsVal: function(){

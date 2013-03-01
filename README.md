@@ -98,7 +98,7 @@ The timings are as follows (on my MacBook Air with a Core i5 @ 1.8GHz):
 * Tcl.js (bytecode context N/A) on V8 (Google Chrome 24): 21225 microseconds per iteration
 
 So it's around 3 times slower than the c interpreter on this benchmark.
-On other browsers it's a very different story unfortunately.  Safari clocks in at about 68000 microseconds, and Firefox (v18.0.1 - with the shiny new IonMonkey engine) managages 140599 microseconds.  I haven't the stomach (or the platform) to test IE.
+On other browsers it's a very different story unfortunately.  Safari clocks in at about 68000 microseconds, and Firefox (v18.0.1 - with the shiny new IonMonkey engine) manages 140599 microseconds.  I haven't the stomach (or the platform) to test IE.
 
 What Is The License?
 --------------------

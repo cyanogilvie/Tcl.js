@@ -175,18 +175,34 @@ function parse_script() {
 		script_str = dom.byId('input_script').value,
 		deep = dom.byId('deep_parse').checked;
 
-	parsed = time(
-		deep ?
-			function(){ return deep_parse(parser.parse_script(script_str)); } :
-			function(){ return parser.parse_script(script_str); },
-		function(elapsed){
-			dom.innerText('parse_feedback',
-				'Time to parse script: '+Math.round(elapsed)+' µs');
+	try {
+		parsed = time(
+			deep ?
+				function(){ return deep_parse(parser.parse_script(script_str)); } :
+				function(){ return parser.parse_script(script_str); },
+			function(elapsed){
+				dom.innerText('parse_feedback',
+					'Time to parse script: '+Math.round(elapsed)+' µs');
+			}
+		);
+	} catch(e) {
+		if (e instanceof parser.ParseError) {
+			var script_frag = script_str.substr(e.char), msg, line, ofs, linestart;
+			line = script_str.substr(0, e.char).replace(/[^\n]+/g, '').length+1;
+			linestart = Math.max(0, script_str.lastIndexOf('\n', e.char));
+			ofs = e.char - linestart;
+			if (script_frag.length > 40) {
+				script_frag = script_frag.substr(0, 37)+'...';
+			}
+			msg = 'Error parsing script: '+e.message+'\n    at line '+line+', character '+ofs+': '+script_frag;
+			alert(msg);
+		} else {
+			throw e;
 		}
-	);
-	//dom.innerText('marked_up_display', script_str);
-	display_script_tokens(parsed);
-	return parsed;
+	} finally {
+		display_script_tokens(parsed);
+		return parsed;
+	}
 }
 
 function visualize_space(str) {
@@ -433,8 +449,10 @@ function display_script_tokens(parsed) {
 		marked_up_node = dom.byId('marked_up_display');
 	dom.empty(node);
 	dom.empty(marked_up_node);
-	marked_up_parent = [marked_up_node];
-	display_token(parsed, node);
+	if (parsed) {
+		marked_up_parent = [marked_up_node];
+		display_token(parsed, node);
+	}
 }
 
 function load_script(script) {

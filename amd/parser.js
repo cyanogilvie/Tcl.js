@@ -77,9 +77,10 @@ var iface, e,
 		/^[?:]/,			3
 	];
 
-function ParseError(message) {
+function ParseError(message, char) {
 	this.name = 'ParseError';
 	this.message = message;
+	this.char = char;
 }
 ParseError.prototype = new Error();
 
@@ -285,7 +286,7 @@ function parse(text, mode, ofs) {
 			emit([SYNTAX, text[i++]]);
 			idx = text.indexOf('}', i);
 			if (idx === -1) {
-				throw new ParseError('missing close-brace for variable name');
+				throw new ParseError('missing close-brace for variable name', i);
 			}
 			token = text.substr(i, idx-i);
 			i += idx-i;
@@ -331,7 +332,7 @@ function parse(text, mode, ofs) {
 
 		while (depth) {
 			m = text.substr(i).match(/(\\*?)?(?:(\{|\})|(\\\n[ \t]*))/);
-			if (m === null) {throw new ParseError('missing close-brace');}
+			if (m === null) {throw new ParseError('missing close-brace', i-1);}
 			if (m[1] !== undefined && m[1].length % 2 === 1) {
 				// The text we found was backquoted, move along
 				i += m.index + m[0].length;
@@ -375,11 +376,11 @@ function parse(text, mode, ofs) {
 			if (quoted) {
 				switch (text[i]) {
 					case undefined:
-						throw new ParseError('missing "');
+						throw new ParseError('missing "', start);
 
 					case '"':
 						if (!ignore_trailing && text[i+1] !== undefined && !(incmdsubst ? /[\s;\]]/ : /[\s;]/).test(text[i+1])) {
-							throw new ParseError('extra characters after close-quote');
+							throw new ParseError('extra characters after close-quote', i+1);
 						}
 						if (i === start + 1) {
 							// Need to manually emit rather than using
@@ -515,7 +516,7 @@ function parse(text, mode, ofs) {
 				value = '';
 			}
 			if (value.length === 0 && type !== END) {
-				throw new Error('Refusing to emit a token of length 0');
+				throw new ParseError('Refusing to emit a token of length 0', i);
 			}
 			tokens.push([type, subtype, crep, value]);
 			i += value.length;
@@ -637,38 +638,38 @@ function parse(text, mode, ofs) {
 				case '{': sub_parse(BRACED, parse_braced);		continue;
 				case '$':
 					sub_parse(VAR, parse_variable, function(tokens){
-						var i, array, index;
-						for (i=0; i<tokens.length; i++) {
-							switch (tokens[i][0]) {
-								case VAR: return [tokens[i][1]];
-								case ARRAY: array = tokens[i][1]; break;
+						var j, array, index;
+						for (j=0; j<tokens.length; j++) {
+							switch (tokens[j][0]) {
+								case VAR: return [tokens[j][1]];
+								case ARRAY: array = tokens[j][1]; break;
 								case INDEX:
-									index = tokens[i][1];
+									index = tokens[j][1];
 									if (index.length === 1 && index[0][0] === TEXT) {
 										// Optimize the common case where the
 										// index is a simple string
 										return [array, index[0][1]];
 									} else {
 										// Index needs runtime resolution
-										return [array, tokens[i][1]];
+										return [array, tokens[j][1]];
 									}
 							}
 						}
-						throw new Error('No variable found');
+						throw new ParseError('No variable found', i);
 					});
 					continue;
 				case '[':
 					sub_parse(SCRIPT, parse_commands, function(tokens){
-						var i;
-						for (i=0; i<tokens.length; i++) {
-							if (tokens[i][0] === SCRIPT) {
-								return tokens[i];
-							} else if (tokens[i][0] === SYNTAX) {
+						var j;
+						for (j=0; j<tokens.length; j++) {
+							if (tokens[j][0] === SCRIPT) {
+								return tokens[j];
+							} else if (tokens[j][0] === SYNTAX) {
 								// Dirty hack to inject the [ syntax token
-								emit_token(SYNTAX, tokens[i][1]);
+								emit_token(SYNTAX, tokens[j][1]);
 							}
 						}
-						throw new Error('No script found');
+						throw new ParseError('No script found', i);
 					});
 					continue;
 				case '(': emit_token(LPAREN, text[i]);			continue;

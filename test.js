@@ -6,17 +6,13 @@ require([
 	'tcl/interp',
 	'tcl/tclobject',
 	'tcl/types',
-	'dojo/dom-construct',
-	'dojo/json',
-	'dojo/query'
+	'demos/dom'
 ], function(
 	parser,
 	TclInterp,
 	tclobj,
 	types,
-	domConstruct,
-	json,
-	query
+	dom
 ) {
 	"use strict";
 
@@ -42,7 +38,7 @@ require([
 				if (token[0] === parser.SCRIPT) {
 					show_script(token[1], tnode, true);
 				} else if (token[0] === parser.INDEX) {
-					show_tokens(token[1], domConstruct.create('span', {
+					show_tokens(token[1], dom.create('span', {
 						className: 'tok_INDEX'
 					}, tnode), false);
 				} else {
@@ -51,11 +47,10 @@ require([
 						classname += ' tok_commandname';
 						first = false;
 					}
-					domConstruct.create('span', {
+					dom.create('span', {
 						className: classname,
-						innerHTML: token[1],
 						title: parser.tokenname[token[0]] + (token[2] !== undefined ? ': "'+token[2]+'"' : '')
-					}, tnode);
+					}, tnode, token[1]);
 				}
 			}
 		}
@@ -79,17 +74,14 @@ require([
 			setup(interp);
 		}
 
-		domConstruct.create('pre', {
-			innerHTML: '<h4>Raw Parse</h4>'+json.stringify(commands)
-		}, 'output');
 		/*
-		domConstruct.create('pre', {
+		dom.create('pre', {
 			innerHTML: '<h4>Exec Parse</h4>'+obj.GetExecParse(interp)
 		}, 'output');
 		 */
-		node = domConstruct.create('pre', {}, 'output');
+		node = dom.create('pre', {}, 'output');
 		show_script(commands[1], node);
-		outputnode = domConstruct.create('pre', {
+		outputnode = dom.create('pre', {
 			className: 'script_output'
 		}, 'output');
 		interp.registerCommand('puts', function(args){
@@ -100,7 +92,7 @@ require([
 			} else {
 				message = args[2];
 			}
-			domConstruct.create('span', {innerHTML: message}, outputnode);
+			dom.create('span', {}, outputnode, message);
 		});
 		interp.registerCommand('getstring', function(args, interp){
 			interp.checkArgs(args, 0, '');
@@ -126,13 +118,13 @@ require([
 			var usec;
 			after = now();
 			usec = (after - before) * 1000;
-			domConstruct.create('span', {className: 'timing', innerHTML: Math.round(usec)+' microseconds per iteration\n'}, outputnode);
+			dom.create('span', {className: 'timing'}, outputnode, Math.round(usec)+' microseconds per iteration\n');
 			if (result.code === types.OK) {
 				console.log('Got ok: ', result, ' string concat: "'+result+'", '+Math.round(usec)+' microseconds');
-				domConstruct.create('span', {className: 'tclresult', innerHTML: result.result+'\n'}, outputnode);
+				dom.create('span', {className: 'tclresult'}, outputnode, result.result+'\n');
 			} else {
 				console.log('Got error: ', result, ': "'+result.result+'"');
-				domConstruct.create('span', {className: 'tclerror', innerHTML: result.result+'\n'}, outputnode);
+				dom.create('span', {className: 'tclerror'}, outputnode, result.result+'\n');
 			}
 		});
 		console.log('TclEval returned');
@@ -156,46 +148,46 @@ require([
 		console.log('TclExpr returned');
 	}
 
-	query('#test1').on('click', function(){
+	dom.onclick('test1', function(){
 		run('set a [getstring; list 2]\nputs "($a)"');
 	});
-	query('#test2').on('click', function(){
+	dom.onclick('test2', function(){
 		run('set a [getstring; list 2]\nputs {($a)}');
 	});
-	query('#test3').on('click', function(){
+	dom.onclick('test3', function(){
 		run('set a [get\\ string; list \\u306f]\nputs ({$a})');
 	});
-	query('#test4').on('click', function(){
+	dom.onclick('test4', function(){
 		run('#comment 1\nset a(foo) [get\\ string; list \\u306f]\nputs "(hello index foo of a: $a(foo))"');
 	});
-	query('#test5').on('click', function(){
+	dom.onclick('test5', function(){
 		run('#comment 1\nset a(foo) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(foo))"');
 	});
 	scriptobj = tclobj.AsObj('#comment 1\nset o 0;set a(fo0\\ o) [get\\ string; list \\u306f\n# comment two\n]\nputs "(hello index foo of a: $a(f[say_o]${o} o)), again: (${a(fo0 o)})"\nputs [bar]; set x {final result};');
 	scriptobj.GetParsedScript();
 	console.log('scriptobj tostring: ('+scriptobj.toString()+')');
-	query('#test6').on('click', function(){
+	dom.onclick('test6', function(){
 		run(scriptobj);
 	});
-	query('#test7').on('click', function(){
+	dom.onclick('test7', function(){
 		run('set d {a A b B c C}; dict get $d b');
 	});
-	query('#test8').on('click', function(){
+	dom.onclick('test8', function(){
 		run('set d {a A b B c C}; dict keys $d');
 	});
-	query('#test9').on('click', function(){
+	dom.onclick('test9', function(){
 		run('set d {a A b B c C}; dict set d b Updated; set d');
 	});
-	query('#test10').on('click', function(){
+	dom.onclick('test10', function(){
 		run('set d {a A b B c C}; dict merge {x X a oldA y Y c oldC} $d');
 	});
-	query('#test11').on('click', function(){
+	dom.onclick('test11', function(){
 		run('set d [dict create a A b B c C]; dict merge {x X a oldA y Y c oldC} $d');
 	});
-	query('#test12').on('click', function(){
+	dom.onclick('test12', function(){
 		run('puts [dict exists {a {b B} c C} a b]; puts [dict exists {a {a B} c C} a x]');
 	});
-	query('#test13').on('click', function(){
+	dom.onclick('test13', function(){
 		//run('set a+b c; puts "hello $a+b"');
 		//expr('$a+-min(3, 4)+[get_num]-$b(y)');
 		//expr('10 - 5');
@@ -204,23 +196,23 @@ require([
 		//expr('6 + -3 + 43 - 4');
 		//expr('2+-min(3, 4)+[get_num]');
 	});
-	query('#expr2').on('click', function(){
+	dom.onclick('expr2', function(){
 		expr('"2012-12-30" <= "2013-01-17"');
 	});
-	query('#expr3').on('click', function(){
+	dom.onclick('expr3', function(){
 		expr('"2013-01-17" <= "2012-12-30"');
 	});
 
-	query('#cs1').on('click', function(){
+	dom.onclick('cs1', function(){
 		run('if {[getstring] eq "result of getstring"} {puts "then body"} else {puts "else body"}');
 	});
-	query('#cs2').on('click', function(){
+	dom.onclick('cs2', function(){
 		run('set acc 0; for {set i 0} {$i < 100} {incr i} {puts "loop body: $i"; if {$i % 2 == 0} continue; if {$i > 9} break; incr acc $i}; puts $acc');
 	});
-	query('#cs3').on('click', function(){
+	dom.onclick('cs3', function(){
 		run('set acc 0; set i 10; puts "i before: $i"; while {[incr i -1]} {puts "loop i: $i"; incr acc $i}; puts $acc');
 	});
-	query('#cf1').on('click', function(){
+	dom.onclick('cf1', function(){
 		run('set v global; puts "v in global, before: ($v)"; proc p {v {d foo}} {puts "v in proc: ($v), d: ($d)"; set v updated}; p 1; puts "v in global, after: ($v)"');
 		run('set v global; puts "v in global, before: ($v)"; proc p {v {d foo}} {puts "v in proc: ($v), d: ($d)"; set v updated}; p; puts "v in global, after: ($v)"');
 		run('set v global; puts "v in global, before: ($v)"; proc p {v {d foo}} {puts "v in proc: ($v), d: ($d)"; set v updated}; p 1 2 3; puts "v in global, after: ($v)"');
@@ -228,17 +220,17 @@ require([
 		run('set v global; puts "v in global, before: ($v)"; proc p {v {d foo} args} {puts "v in proc: ($v), d: ($d), args: ($args)"; set v updated}; p 1 2; puts "v in global, after: ($v)"');
 		run('set v global; puts "v in global, before: ($v)"; proc p {v {d foo} args} {puts "v in proc: ($v), d: ($d), args: ($args)"; set v updated}; p 1 2 3 4; puts "v in global, after: ($v)"');
 	});
-	query('#cf2').on('click', function(){
+	dom.onclick('cf2', function(){
 		//run('proc foo {a b} {return "$a-$b"}; foo 1 2; foo 3 4');
 		run('proc newcmd {a b} {return "$a-$b"}; set i 0; newcmd 1 $i; incr i; newcmd 1 $i');
 		run('proc newcmd {a b} {return "$a-$b"}; for {set i 0} {$i < 2} {incr i} {newcmd 1 $i}');
 	});
-	query('#prof1').on('click', function(){
+	dom.onclick('prof1', function(){
 		run('for {set i 0} {$i < 10000} {incr i} nop', function(I){
 			I.registerCommand('nop', function(){});
 		});
 	});
-	query('#prof2').on('click', function(){
+	dom.onclick('prof2', function(){
 		//run('proc newcmd {a b} {return "$a-$b"}');
 		//run('proc newcmd {a b} {set b}');
 		//run('proc newcmd {a b} {}');
@@ -251,7 +243,7 @@ require([
 		run('proc nop {{i {}}} {}; for {set i 0} {$i < 10000} {incr i} nop');
 		run('proc nop args {}; for {set i 0} {$i < 10000} {incr i} {nop $i}');
 	});
-	query('#prof3').on('click', function(){
+	dom.onclick('prof3', function(){
 		var BoolObj = require('tcl/objtype_bool');
 		run('for {set i 0} {$i < 10000} {incr i} nop', function(I){
 			var trueObj = new BoolObj(true),
@@ -299,10 +291,10 @@ require([
 			});
 		});
 	});
-	query('#prof4').on('click', function(){
+	dom.onclick('prof4', function(){
 		var before, after, i, outputnode;
 
-		outputnode = domConstruct.create('pre', {
+		outputnode = dom.create('pre', {
 			className: 'script_output'
 		}, 'output');
 
@@ -318,94 +310,94 @@ require([
 		while (typeof f === "function") {f = f();}
 		after = now();
 
-		domConstruct.create('span', {className: 'timing', innerHTML: (after-before)+' microseconds\n'}, outputnode);
+		dom.create('span', {className: 'timing'}, outputnode, (after-before)+' microseconds\n');
 	});
-	query('#str1').on('click', function(){
+	dom.onclick('str1', function(){
 		run('string length "hello, world"');
 	});
-	query('#str2').on('click', function(){
+	dom.onclick('str2', function(){
 		run('string map -nocase {Foo FOO bar bAR b *b*} "hello foo baR world baz"');
 		run('string map {foo FOO bar bAR b *b*} "hello foo bar world baz"');
 	});
-	query('#str3').on('click', function(){
+	dom.onclick('str3', function(){
 		run('string trim " 	hello,\nworld\n\t "');
 		run('string trim "hello,\nworld\n\t "');
 		run('string trim " 	hello,\nworld"');
 		run('string trim "hello,\nworld"');
 		run('string trim "/hello,\nworld|" /|');
 	});
-	query('#str4').on('click', function(){
+	dom.onclick('str4', function(){
 		run('string trimleft " 	hello,\nworld\n\t "');
 		run('string trimleft "hello,\nworld\n\t "');
 		run('string trimleft " 	hello,\nworld"');
 		run('string trimleft "hello,\nworld"');
 		run('string trimleft "/hello,\nworld|" /|');
 	});
-	query('#str5').on('click', function(){
+	dom.onclick('str5', function(){
 		run('string trimright " 	hello,\nworld\n\t "');
 		run('string trimright "hello,\nworld\n\t "');
 		run('string trimright " 	hello,\nworld"');
 		run('string trimright "hello,\nworld"');
 		run('string trimright "/hello,\nworld|" /|');
 	});
-	query('#str6').on('click', function(){
+	dom.onclick('str6', function(){
 		run('string tolower "hello, World"');
 		run('string tolower "hello, World" 4');
 		run('string tolower "hello, World" 4 4+3');
 		run('string tolower "hello, World" 4 end');
 		run('string tolower "hello, World" 4 end-2');
 	});
-	query('#str7').on('click', function(){
+	dom.onclick('str7', function(){
 		run('string toupper "hello, World"');
 		run('string toupper "hello, World" 4');
 		run('string toupper "hello, World" 4 4+3');
 		run('string toupper "hello, World" 4 end');
 		run('string toupper "hello, World" 4 end-2');
 	});
-	query('#str8').on('click', function(){
+	dom.onclick('str8', function(){
 		run('string totitle "hello, WORLD"');
 		run('string totitle "hello, WORLD" 4');
 		run('string totitle "hello, WORLD" 4 4+3');
 		run('string totitle "hello, WORLD" 4 end');
 		run('string totitle "hello, WORLD" 4 end-2');
 	});
-	query('#str9').on('click', function(){
+	dom.onclick('str9', function(){
 		run('string bytelength "hello, world"');
 		run('string bytelength "は"');
 	});
-	query('#str10').on('click', function(){
+	dom.onclick('str10', function(){
 		run('string first bar "foo bar baz"');
 		run('string first bat "foo bar baz"');
 		run('string first bar "foo bar baz" 4');
 		run('string first bar "foo bar baz" 6');
 	});
-	query('#str11').on('click', function(){
+	dom.onclick('str11', function(){
 		run('string last bar "foo bar baz"');
 		run('string last bat "foo bar baz"');
 		run('string last bar "foo bar baz" 4');
 		run('string last bar "foo bar baz" 2');
 		run('string last bar "foo bar baz" end-2');
 	});
-	query('#str12').on('click', function(){
+	dom.onclick('str12', function(){
 		run('string index "hello, world" 0');
 		run('string index "hello, world" 4');
 		run('string index "hello, world" end');
 		run('string index "hello, world" end-1');
 	});
-	query('#str13').on('click', function(){
+	dom.onclick('str13', function(){
 		run('string range "hello, world" -1 100');
 		run('string range "hello, world" 4 end');
 		run('string range "hello, world" 0 end-1');
 		run('string range "hello, world" 0 0+5');
 	});
-	query('#str14').on('click', function(){
+	dom.onclick('str14', function(){
 		run('string reverse "hello, world"');
 	});
-	query('#str15').on('click', function(){
+	dom.onclick('str15', function(){
 		run('string repeat "xy" 4');
 		run('string repeat "xy" -1');
 	});
-	query('#str16').on('click', function(){
+	dom.onclick('str16', function(){
 		run('string replace "hello, world" 0 end');
 		run('string replace "hello, world" 0 end NEW');
 		run('string replace "hello, world" -1 100 NEW');
@@ -414,7 +406,7 @@ require([
 		run('string replace "hello, world" 1 end-2 NEW');
 		run('string replace "hello, world" end-8 end-2 NEW');
 	});
-	query('#str17').on('click', function(){
+	dom.onclick('str17', function(){
 		run('string match *lo,* "hello, world"');
 		run('string match *lo!* "hello, world"');
 		run('string match *lo, "hello, world"');
@@ -430,7 +422,7 @@ require([
 		run('string match -nocase {*[lx]lo? *} "HELLO, WORLD"');
 		run('string match -nocase {*[ax]lo? *} "HELLO, WORLD"');
 	});
-	query('#str18').on('click', function(){
+	dom.onclick('str18', function(){
 		run('string wordstart "foo bar baz" 3');
 		run('string wordstart "foo bar baz" 2');
 		run('string wordstart "foo bar baz" 4');
@@ -438,7 +430,7 @@ require([
 		run('string wordstart "foo bar baz" -2');
 		run('string wordstart "foo bar baz" 20');
 	});
-	query('#str19').on('click', function(){
+	dom.onclick('str19', function(){
 		run('string wordend "foo bar baz" -2');
 		run('string wordend "foo bar baz" 3');
 		run('string wordend "foo bar baz" 2');
@@ -446,12 +438,12 @@ require([
 		run('string wordend "foo bar baz" 10');
 		run('string wordend "foo bar baz" 20');
 	});
-	query('#str20').on('click', function(){
+	dom.onclick('str20', function(){
 		run('string compare foo bar');
 		run('string compare foo foo');
 		run('string compare bar foo');
 	});
-	query('#str21').on('click', function(){
+	dom.onclick('str21', function(){
 		run('string equal foo bar');
 		run('string equal foo foo');
 		run('string equal foo Foo');
@@ -459,7 +451,7 @@ require([
 		run('string equal -length 2 foo fox');
 		run('string equal -length 3 foo fox');
 	});
-	query('#str22').on('click', function(){
+	dom.onclick('str22', function(){
 		run('string is alnum ""');
 		run('string is alnum -strict ""');
 		run('string is alnum "foobar"');
@@ -475,7 +467,7 @@ require([
 		run('set fv notset; string is alnum -failindex fv "foo bar"; set fv');
 		run('set fv notset; string is alnum -failindex fv "fooBar"; set fv');
 	});
-	query('#cmdredef1').on('click', function(){
+	dom.onclick('cmdredef1', function(){
 		run('proc foo {} {return initial}; puts "1: [foo]"; proc foo {} {return changed}; puts "2: [foo]"');
 	});
 });

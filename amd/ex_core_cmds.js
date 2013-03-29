@@ -8,6 +8,7 @@ define([
 	'./ex_dict_cmds',
 	'./ex_string_cmds',
 	'./ex_array_cmds',
+	'./ex_clock_cmds',
 	'./types',
 	'./objtype_int'
 ], function(
@@ -17,6 +18,7 @@ define([
 	ex_dict_cmds,
 	ex_string_cmds,
 	ex_array_cmds,
+	ex_clock_cmds,
 	types,
 	IntObj
 ){
@@ -164,6 +166,7 @@ function install(interp) {
 	ex_dict_cmds.install(interp);
 	ex_string_cmds.install(interp);
 	ex_array_cmds.install(interp);
+	ex_clock_cmds.install(interp);
 }
 
 return {'install': install};

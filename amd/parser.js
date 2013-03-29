@@ -59,7 +59,7 @@ var iface, e,
 		SCRIPTARG	: SCRIPTARG,
 		EXPRARG		: EXPRARG
 	}, operators = [
-		/^[~!]/,			1,
+		/^~|!(?=[^=])/,		1,
 		/^\*\*/,			2,
 		/^[*\/%]/,			2,
 		/^[\-+]/,			2,

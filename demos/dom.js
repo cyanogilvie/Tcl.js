@@ -81,6 +81,10 @@ var dom = {
 		dom.byId(id).onclick = f;
 	},
 
+	onkeydown: function(id, f){
+		dom.byId(id).onkeydown = f;
+	},
+
 	byId: function(id){
 		return document.getElementById(id);
 	},

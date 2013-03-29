@@ -380,6 +380,8 @@ function parse(text, mode, ofs) {
 
 					case '"':
 						if (!ignore_trailing && text[i+1] !== undefined && !(incmdsubst ? /[\s;\]]/ : /[\s;]/).test(text[i+1])) {
+							var lineno = text.substr(0, i).replace(/[^\n]/, '').length;
+							//console.log('line: '+lineno+': '+text.substr(i-5, 10));
 							throw new ParseError('extra characters after close-quote', i+1);
 						}
 						if (i === start + 1) {
@@ -486,6 +488,7 @@ function parse(text, mode, ofs) {
 				}
 				emit([COMMENT, token]);
 			}
+			m = null;
 		}
 
 		// handle {*}

@@ -1,0 +1,101 @@
+BODY {
+	background: #d8d8da;
+}
+
+.output {
+	overflow: auto;
+	border: 1px solid black;
+	position: absolute;
+	margin-top: 1.5em;
+	top: 0; bottom: 0;
+	left: 0; right: 0;
+	-o-tab-size: 4;
+	-moz-tab-size: 4;
+	tab-size: 4;
+
+	background: black;
+	color: rgb(230, 230, 230);
+	padding: 0.3em;
+}
+
+.title {
+	font: 1.3em;
+}
+
+#buttons {
+	position: absolute;
+	top: 0.5em;
+	left: 0.5em;
+	right: 0.5em;
+	height: 1.7em;
+}
+
+#marked_up {
+	position: absolute;
+	left: 0.5em; right: 0.5em;
+	top: 1.5em; bottom: 20em;
+}
+
+#console_result {
+	position: absolute;
+	height: 18em;
+	left: 0.5em; right: 0.5em;
+	bottom: 2.2em;
+	background: white;
+	border: 1px solid black;
+	overflow: scroll;
+}
+
+#console_input {
+	position: absolute;
+	height: 1.5em;
+	left: 0.5em; right: 0.5em;
+	bottom: 0.5em;
+	background: white;
+	border: 1px solid black;
+}
+
+#parse_feedback {
+	margin-left: 0.6em;
+}
+
+.string {color: #f1b;}
+.number	{color: #e00;}
+.null	{color: #0e0;}
+.commandMarker, .wordMarker {color: #999;}
+
+.tok:hover {
+	background: yellow;
+	color: black;
+}
+.tok_SYNTAX, .tok_END, .tok_EOL {
+	color: #555;
+}
+.tok_COMMENT {
+	color: #533;
+}
+.tok_SPACE {
+	border-bottom: 1px solid #444;
+}
+.tok_commandname {
+	color: #ee0;
+}
+.tok_VAR, .tok_ARRAY {
+	color: #55f;
+}
+.tok_INDEX {
+	color: #99f;
+}
+.tok_ESCAPE {
+	background: rgba(255, 60, 128, 0.3);
+	/* color: black; */
+}
+
+.breakpoint {
+	outline: 1px dashed blue;
+	background: #036;
+}
+
+.error {
+	color: red;
+}

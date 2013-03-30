@@ -1,0 +1,348 @@
+#!/usr/bin/env node
+/*jslint white: true, sloppy: true, plusplus: true */
+
+var requirejs = require('requirejs');
+requirejs.config({
+	baseUrl: '/home/cyan/git',
+	paths: {
+		tcl:	'Tcl.js/amd'
+	},
+	nodeRequire: require
+});
+
+requirejs([
+	'tcl/parser',
+	'tcl/list'
+], function(
+	parser,
+	tcllist
+){
+'use strict';
+
+var EXPRARG = parser.EXPRARG,
+	SCRIPTARG = parser.SCRIPTARG,
+	cmd_parse_info = {
+	'if': function(words){
+		var special = [
+			1, EXPRARG
+		], wordtext, p;
+
+		for (p=2; p<words.length; p++) {
+			wordtext = get_text(words[p]);
+			switch (wordtext) {
+				case 'then':
+				case 'else':
+					break;
+				case 'elseif':
+					special.push(++p, EXPRARG);
+					break;
+				default:
+					if (wordtext != null) {
+						special.push(p, SCRIPTARG);
+					}
+			}
+		}
+
+		return special;
+	},
+
+	'expr':		function(words){
+		return words.length === 1 ? [1, EXPRARG] : [];
+	},
+	'foreach':	function(words){
+		return [words.length-1, SCRIPTARG];
+	},
+	'lmap':		function(words){ return [words.length-1, SCRIPTARG]; },
+	'for':		[1, SCRIPTARG, 2, EXPRARG, 3, SCRIPTARG, 4, SCRIPTARG],
+	'while':	[1, EXPRARG, 2, SCRIPTARG],
+	'proc':		[3, SCRIPTARG]
+};
+
+function real_word(word) {
+	var i, type;
+	for (i=0; i<word.length; i++) {
+		type = word[i][0];
+		if (
+			type === parser.SPACE ||
+			type === parser.COMMENT ||
+			type === parser.END
+		) {
+			continue;
+		}
+		return true;
+	}
+	return false;
+}
+
+function real_words(words) {
+	var i, realwords = [];
+
+	for (i=0; i<words.length; i++) {
+		if (real_word(words[i])) {
+			realwords.push(words[i]);
+		}
+	}
+	return realwords;
+}
+
+function get_text(word, raw) {
+	var i, text=[];
+	for (i=0; i<word.length; i++) {
+		switch (word[i][0]) {
+			case parser.TEXT:		text.push(word[i][1]); break;
+			case parser.ESCAPE:		text.push(word[i][raw?1:2]); break;
+			case parser.SPACE:		break;
+			case parser.END:		break;
+			case parser.SYNTAX:		break;
+			case parser.COMMENT:	break;
+			default:				return null;
+		}
+	}
+	return text.length ? text.join('') : null;
+}
+
+function word_start(word) {
+	var i;
+	for (i=0; i<word.length; i++) {
+		if (word[i][0] === parser.TEXT || word[i][0] === parser.ESCAPE) {
+			return word[i][3];
+		}
+	}
+}
+
+function replace_static(tokens, token) {
+	var i=0, replaced=false, out=[];
+
+	for (i=0; i<tokens.length; i++) {
+		if (tokens[i][0] === parser.TEXT || tokens[i][0] === parser.ESCAPE) {
+			if (!replaced) {
+				out.push(token);
+				replaced = true;
+			}
+		} else {
+			out.push(tokens[i]);
+		}
+	}
+	if (!replaced) {
+		throw new Error('Couldn\'t find static tokens to replace');
+	}
+	return out;
+}
+
+function deep_parse(script_tok) {
+	var commands=script_tok[1], command, i, j, k, parse_info, special, txt, ofs;
+
+	for (i=0; i<commands.length; i++) {
+		command = commands[i];
+		//console.log('Parsing command "'+get_text(command[0])+'"');
+		parse_info = cmd_parse_info[get_text(command[0])];
+		if (parse_info === undefined) {continue;}
+		special = typeof parse_info === 'function' ?
+			parse_info(command) : parse_info;
+		for (j=0; j<special.length; j+=2) {
+			k = special[j];
+			txt = get_text(command[k], true);
+			if (txt == null) {
+				// word text is dynamic - comes from a variable or
+				// result of a command, so we can't statically parse it
+				break;
+			}
+			switch (special[j+1]) {
+				case SCRIPTARG:
+					ofs = word_start(command[k]);
+					command[k] = replace_static(command[k], [
+						SCRIPTARG,
+						command[k].slice(),
+						deep_parse(parser.parse_script(txt, ofs)),
+						ofs
+					]);
+					break;
+
+				case EXPRARG:
+					// TODO
+					break;
+			}
+		}
+	}
+	return script_tok;
+}
+
+function parse_script(script_str) {
+	return deep_parse(parser.parse_script(script_str));
+	//return parser.parse_script(script_str);
+}
+
+function reconstitute_word(word) {
+	var script='', k, token;
+	for (k=0; k<word.length; k++) {
+		token = word[k];
+		switch (token[0]) {
+			case parser.SCRIPT:
+				script += reconstitute(token[1]);
+				break;
+			case parser.SCRIPTARG:
+				script += reconstitute(token[2][1]);
+				break;
+			case parser.INDEX:
+				script += reconstitute_word(token[1]);
+				break
+			default:
+				script += token[1];
+		}
+	}
+	return script;
+}
+
+function reconstitute(commands) {
+	var i, j, k, script='', command, word, token;
+
+	for (i=0; i<commands.length; i++) {
+		command = commands[i];
+		for (j=0; j<command.length; j++) {
+			word = command[j];
+			script += reconstitute_word(word);
+		}
+	}
+
+	return script;
+}
+
+function instrument(commands) {
+	var i, j, k, script='', command, newcommand, word, token, outcommands=[], endtok, cmdofs, cmdendofs;
+
+	for (i=0; i<commands.length; i++) {
+		command = commands[i];
+		cmdofs = null;
+		for (j=0; j<command.length; j++) {
+			word = command[j];
+			for (k=0; k<word.length; k++) {
+				token = word[k];
+				if (token[0] !== parser.SPACE && token[0] !== parser.COMMENT && cmdofs == null) {
+					cmdofs = token[3];
+				}
+				switch (token[0]) {
+					case parser.SCRIPT:
+						token[1] = instrument(token[1]);
+						break;
+					case parser.SCRIPTARG:
+						token[2][1] = instrument(token[2][1]);
+						break;
+					case parser.END:
+						endtok = word.pop();
+						/*
+						endtok = token.slice();
+						word[k] = [parser.SYNTAX, ''];
+						*/
+				}
+				if (token[0] !== parser.END) {
+					cmdendofs = token[3] + token[1].length-1;
+				}
+			}
+		}
+		if (real_words(command).length === 0) {
+			outcommands.push(command);
+		} else {
+			newcommand = [
+				[[parser.TXT, 'する']],
+				[[parser.SPACE, ' '], [parser.TXT, cmdofs]],
+				[[parser.SPACE, ' '], [parser.TXT, cmdendofs]],
+				[[parser.SPACE, ' '], [parser.TXT, tcllist.array2list([reconstitute([command])])], endtok],
+			];
+			outcommands.push(newcommand);
+		}
+	}
+
+	return outcommands;
+}
+
+var stdin = process.openStdin(),
+	source = '';
+
+stdin.on('data', function(chunk){
+	source += chunk;
+});
+stdin.on('end', function(){
+	var	parsed = parse_script(source)[1],
+		instrumented = instrument(parsed),
+		srckey = Math.round(Math.random()*Math.pow(2,20));
+
+	instrumented.unshift([
+		[[parser.txt, 'global __breakpoints __debug; array set __breakpoints {}; set __debug(stepping) 1'], [parser.END, '\n']],
+	],[
+		[[parser.TXT, 'proc']],
+		[[parser.SPACE, ' '], [parser.TXT, 'てがみ']],
+		[[parser.SPACE, ' '], [parser.TXT, '{t m}']],
+		[[parser.SPACE, ' '], [parser.TXT, '{return [list $t [string length $m]]\\n$m}'], [parser.END, '\n']]
+	],[
+		[[parser.TXT, 'proc']],
+		[[parser.SPACE, ' '], [parser.TXT, 'みる']],
+		[[parser.SPACE, ' '], [parser.TXT, '{}']],
+		[[parser.SPACE, ' '], [parser.TXT, '{set l [gets [こ]]; read [こ] $l}'], [parser.END, '\n']]
+	],[
+		[[parser.TXT, 'proc']],
+		[[parser.SPACE, ' '], [parser.TXT, 'こ']],
+		[[parser.SPACE, ' '], [parser.TXT, '{}']],
+		[[parser.SPACE, ' '], [parser.TXT, '{'+
+		'	global こ\n'+
+		'	if {![info exists こ]} {\n'+
+		'		set こ [socket localhost 1234]\n'+
+		'		fconfigure [set こ] -blocking 1 -buffering none -translation binary\n'+
+		'		puts -nonewline [set こ] [てがみ s '+tcllist.to_tcl([[srckey, source]])+']\n'+
+		'	}\n'+
+		'	set こ\n'+
+		'}'], [parser.END, '\n']]
+	],[
+		[[parser.TXT, 'proc']],
+		[[parser.SPACE, ' '], [parser.TXT, 'する']],
+		[[parser.SPACE, ' '], [parser.TXT, '{o e s}']],
+		[[parser.SPACE, ' '], [parser.TXT, '{\n'+
+		'	global __debug __breakpoints\n'+
+		'	if {[info exists __breakpoints($o)]} {\n'+
+		'		set __debug(stepping)	1\n'+
+		'		if {$__breakpoints($o) == "oneshot"} {array unset __breakpoints $o}\n'+
+		'	}\n'+
+		'	if {$__debug(stepping)} {
+		'		puts -nonewline [こ] [てがみ c [list '+srckey+' $o $e]]\n'+
+		'	}\n'+
+		'	while {1} {set msg [みる]\n'+
+		'		set op	[lindex $msg 0]\n'+
+		'		switch -- $op {\n'+
+		'			n break\n'+
+		'			r {set code [catch {uplevel 1 [lindex $msg 1]} res]; puts -nonewline [こ] [てがみ a [list $code $res]]}\n'+
+		'			i {set s [lindex $msg 1]}\n'+
+		'			b {set __breakpoints([lindex $msg 1]) 1}\n'+
+		'			x {array unset __breakpoints [lindex $msg 1]}\n'+
+		'			c {set __debug(stepping) 0; break}\n'+
+		'		}\n'+
+		'	}\n'+
+		'	set code	[catch {uplevel 1 $s} res]\n'+
+		'	if {$__debug(stepping)} {\n'+
+		'		puts -nonewline [こ] [てがみ r [list '+srckey+' $o $e $code $res]]\n'+
+		'	}\n'+
+		'	while {1} {set msg [みる]\n'+
+		'		set op	[lindex $msg 0]\n'+
+		'		switch -- $op {\n'+
+		'			n break\n'+
+		'			r {set c [catch {uplevel 1 [lindex $msg 1]} r]; puts -nonewline [こ] [てがみ a [list $c $r]]}\n'+
+		'			b {set __breakpoints([lindex $msg 1]) 1}\n'+
+		'			x {array unset __breakpoints [lindex $msg 1]}\n'+
+		'			c {set __debug(stepping) 0; break}\n'+
+		'		}\n'+
+		'	}\n'+
+		'	switch -- $code {\n'+
+		'		0 {return $res}\n'+
+		'		1 {error $res}\n'+
+		'		2 {return -code return $res}\n'+
+		'		3 {return -code break}\n'+
+		'		4 {return -code continue}\n'+
+		'		default {return -code $code $res}\n'+
+		'	}\n'+
+		'}'], [parser.END, '\n']]
+	]);
+
+	console.log(reconstitute(instrumented));
+
+	process.exit();
+});
+});
+

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Tcl Debugger</title>
+		<script type="text/javascript">
+			function here(){
+				return location.pathname.replace(/\/[^/]+$/, '');
+			}
+		</script>
+		<script type="text/javascript">
+			var dojoConfig = {
+				async: 1,
+				dojoBlankHtmlUrl: here()+'/blank.html',
+				packages: [
+					{name: 'cfcrypto', location: here()+'/modules/crypto/src/amd'},
+					{name: 'codeforge', location: here()+'/modules/codeforge'},
+					{name: 'workflow', location: here()+'/modules/workflow'},
+					{name: 'evlog', location: here()+'/modules/evlog'},
+					{name: 'm2', location: here()+'/modules/m2'},
+					{name: 'sop', location: here()+'/modules/sop/amd'},
+					{name: 'tcl', location: here()+'/tcl'},
+					{name: 'webtoolkit', location: here()+'/modules/3rd_party/webtoolkit'},
+					{name: 'cflib', location: here()+'/modules/cflib/amd'}
+				]
+			};
+		</script>
+		<script src="socket.io/socket.io.min.js"></script>
+		<script src="//ajax.googleapis.com/ajax/libs/dojo/1.8.3/dojo/dojo.js"></script>
+		<link rel="stylesheet" type="text/css" href="debugger.css" />
+		<script src="debugger.js"></script>
+    </head>
+    <body>
+		<div id="buttons">
+			<button id="pause" title="Pause">||</button>
+			<button id="continue" title="Continue">▸</button>
+			<button id="step_over" title="Step over">⤸</button>
+			<button id="step_into" title="Step into">⤷</button>
+			<button id="step_out" title="Step out">⤶</button>
+			<button id="clear_console" title="Clear console">Clear Console</button>
+			<div id="status"></div>
+		</div>
+		<div id="marked_up">
+			<pre id="marked_up_display" class="output"></pre>
+		</div>
+		<pre id="console_result"></pre>
+		<input type="text" id="console_input"></input>
+    </body>
+</html>

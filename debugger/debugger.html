@@ -31,17 +31,15 @@
 		<script src="debugger.js"></script>
     </head>
     <body>
-		<div id="buttons">
-			<button id="pause" title="Pause">||</button>
-			<button id="continue" title="Continue">▸</button>
-			<button id="step_over" title="Step over">⤸</button>
-			<button id="step_into" title="Step into">⤷</button>
-			<button id="step_out" title="Step out">⤶</button>
+		<pre id="marked_up_display" class="output"></pre>
+		<div id="buttons"
+			><button id="pause" title="Pause">||</button
+			><button id="continue" title="Continue">▸</button
+			><button id="step_over" title="Step over">⤸</button
+			><button id="step_into" title="Step into">⤷</button
+			><button id="step_out" title="Step out">⤶</button>
 			<button id="clear_console" title="Clear console">Clear Console</button>
 			<div id="status"></div>
-		</div>
-		<div id="marked_up">
-			<pre id="marked_up_display" class="output"></pre>
 		</div>
 		<pre id="console_result"></pre>
 		<input type="text" id="console_input"></input>

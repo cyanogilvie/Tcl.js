@@ -78,18 +78,29 @@ function initialize_state(data) {
 	scripts = tcllist.list2dict(state.scripts);
 }
 
+function scrollIntoViewMiddle(node) {
+	var view = dom.byId('marked_up_display'),
+		documentOffsetTop = node.offsetTop;
+
+	view.scrollTo(0, documentOffsetTop - (view.innerHeight / 2));
+}
+
 function show_location(scrid, start, end) {
 	if (!stepping) return;
 
 	if (current_script !== scrid) {
 		load_script(scrid);
+		current_script = scrid;
 	}
+	console.log('show_location: '+scrid+','+start+','+end);
 	dynStyleNode.innerHTML = '#cmd_'+start+'-'+end+' {outline: 1px dashed red; background: #400;}';
+	dom.byId('cmd_'+start+'-'+end).scrollIntoView();
+	//dom.byId('marked_up_display').scrollByLines(2);
+	//scrollIntoViewMiddle(dom.byId('cmd_'+start+'-'+end));
 }
 
 function enter(scrid, start, end) {
 	var key = scrid+','+start+','+end;
-	show_location(scrid, start, end);
 	if (breakpoints[key] != null) {
 		stepping = true;
 		depth_trigger = null;
@@ -97,6 +108,7 @@ function enter(scrid, start, end) {
 			delete breakpoints[key];
 		}
 	}
+	show_location(scrid, start, end);
 	if (!stepping) {
 		step();
 		return;
@@ -131,10 +143,9 @@ function leave(scrid, start, end, code, res) {
 
 function step() {
 	m2.rsj_req(debugger_jmid[0], 'step', function(msg){
-		switch (msg.type) {
-			case 'nack':
-				log.error('Error sending step request: '+msg.data);
-				alert('Error sending step request: '+msg.data);
+		if (msg.type === 'nack') {
+			log.error('Error sending step request: '+msg.data);
+			alert('Error sending step request: '+msg.data);
 		}
 	});
 }
@@ -144,8 +155,13 @@ function pause() {
 }
 
 function run() {
+	m2.rsj_req(debugger_jmid[0], 'continue', function(msg){
+		if (msg.type === 'back') {
+			alert('Error sending continue request: '+msg.data);
+		}
+	});
 	stepping = false;
-	step();
+	depth_trigger = null;
 }
 
 function step_over() {
@@ -167,16 +183,29 @@ function toggle_breakpoint(scrid, from, to) {
 	var key = scrid+','+from+','+to, nodeid = 'cmd_'+from+'-'+to;
 	console.log('toggle_breakpoint, nodeid: "'+nodeid+'"');
 	if (breakpoints[key] == null) {
+		console.log('Sending "set_breakpoint '+from+'"');
+		m2.rsj_req(debugger_jmid[0], 'set_breakpoint '+from, function(msg){
+			if (msg.type == 'nack') {
+				alert('Error setting breakpoint: '+msg.data);
+			}
+		});
 		breakpoints[key] = true;
+		console.log('Adding breakpoint class to ', nodeid);
 		domClass.add(nodeid, 'breakpoint');
-
 	} else {
+		m2.rsj_req(debugger_jmid[0], 'clear_breakpoint '+from, function(msg){
+			if (msg.type == 'nack') {
+				alert('Error removing breakpoint: '+msg.data);
+			}
+		});
 		delete breakpoints[key];
+		console.log('Removing breakpoint class from ', nodeid);
 		domClass.remove(nodeid, 'breakpoint');
 	}
 }
 
 function console_command(cmd) {
+	dom.create('div', {className: 'question'}, dom.byId('console_result'), '> '+cmd).scrollIntoView(false);
 	m2.rsj_req(debugger_jmid[0], tcllist.to_tcl(['command', cmd]), function(msg){
 		switch (msg.type) {
 			case 'nack':
@@ -187,7 +216,7 @@ function console_command(cmd) {
 }
 
 function command_answer(code, res) {
-	dom.create('div', {className: code === 1 ? 'error' : ''}, dom.byId('console_result'), res);
+	dom.create('div', {className: code === '1' ? 'answer error' : 'answer'}, dom.byId('console_result'), res).scrollIntoView(false);
 }
 
 function update_state(data) {
@@ -440,7 +469,7 @@ function markup_tok_element(any) {
 
 function display_token(token, scrid) {
 	var i, j, k, type = token[0], node, subnode, commands, command, word,
-		cNode, wNode, tNode, attribs = {}, from, to, commandspan;
+		cNode, wNode, tNode, attribs = {}, from, to, commandspan, newnode, tmp;
 
 	switch (type) {
 		case parser.SCRIPTARG:
@@ -461,12 +490,27 @@ function display_token(token, scrid) {
 					}
 					word = command[j];
 					for (k=0; k<word.length; k++) {
-						if (word[k][0] !== parser.SPACE && from == null) {
-							from = word[k][3];
+						if (from == null) {
+							if (word[k][0] === parser.SPACE || word[k][0] === parser.COMMENT) {
+								// nasty hack to move leading SPACE and COMMENT
+								// tokens out of the command span
+								commandspan.parentNode.insertBefore(
+										display_token(word[k], scrid),
+										commandspan);
+								continue;
+							} else {
+								from = word[k][3];
+							}
 						}
-						display_token(word[k], scrid);
 						if (word[k][0] !== parser.END) {
 							to = word[k][3] + word[k][1].length-1;
+							display_token(word[k], scrid);
+						} else {
+							// nasty hack to move the END token out of the
+							// command span
+							tmp = marked_up_parent.pop();
+							display_token(word[k], scrid);
+							marked_up_parent.push(tmp);
 						}
 					}
 					if (j === 0) {
@@ -479,21 +523,25 @@ function display_token(token, scrid) {
 					commandspan.setAttribute('data-scrid', scrid);
 					commandspan.setAttribute('data-from', from);
 					commandspan.setAttribute('data-to', to);
+					if (breakpoints[scrid+','+from+','+to] != null) {
+						domClass.add(commandspan, 'breakpoint');
+					}
 				}
 			}
+			newnode = commandspan;
 			break;
 
 		case parser.INDEX:
 			push_marked_up_parent({className: 'tok_INDEX'});
 			for (i=0; i<token[1].length; i++) {
-				display_token(token[1][i], scrid);
+				newnode = display_token(token[1][i], scrid);
 			}
 			marked_up_parent.pop();
 			break;
 
 		case parser.EXPRARG:
 			for (i=0; i<token[2].length; i++) {
-				display_expr_token(token[2][i]);
+				newnode = display_expr_token(token[2][i]);
 			}
 			break;
 
@@ -508,12 +556,13 @@ function display_token(token, scrid) {
 		case parser.ARRAY:
 		case parser.EXPAND:
 		case parser.ESCAPE:
-			dom.create('span', {className: 'tok tok_'+tokname(type)}, marked_up_parent[marked_up_parent.length-1], token[1]);
+			newnode = dom.create('span', {className: 'tok tok_'+tokname(type)}, marked_up_parent[marked_up_parent.length-1], token[1]);
 			break;
 
 		default:
 			console.warn('Unhandled token type: '+type+', "'+parser[type]+'"');
 	}
+	return newnode;
 }
 
 function display_expr_token(token) {

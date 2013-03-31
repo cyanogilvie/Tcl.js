@@ -1,5 +1,8 @@
-BODY {
+BODY, HTML {
 	background: #d8d8da;
+	padding: 0;
+	margin: 0;
+	height: 100%;
 }
 
 .output {
@@ -22,32 +25,55 @@ BODY {
 	font: 1.3em;
 }
 
+#marked_up_display {
+	position: absolute;
+	left: 0.5em; right: 0.5em;
+	top: 0.5em; bottom: 22.7em;
+	margin: 0;
+}
+
 #buttons {
 	position: absolute;
-	top: 0.5em;
 	left: 0.5em;
 	right: 0.5em;
+	bottom: 16.7em;
 	height: 1.7em;
 }
 
-#marked_up {
-	position: absolute;
-	left: 0.5em; right: 0.5em;
-	top: 1.5em; bottom: 20em;
+#buttons > BUTTON {
+	margin-left: 0px;
+	margin-right: 0px;
 }
 
 #console_result {
 	position: absolute;
-	height: 18em;
+	margin: 0;
+	padding: 0.3em;
+	height: 17.7em;
 	left: 0.5em; right: 0.5em;
-	bottom: 2.2em;
+	bottom: 2.1em;
 	background: white;
 	border: 1px solid black;
-	overflow: scroll;
+	overflow-y: auto;
+	white-space: pre-wrap;
+}
+
+.question {
+	color: blue;
+	font-size: 0.9em;
+}
+
+.answer {
+	border-bottom: 1px solid #ccc;
+	margin-top: 0.1em;
+	margin-bottom: 0.2em;
+	padding-bottom: 0.1em;
+	font-size: 0.9em;
 }
 
 #console_input {
 	position: absolute;
+	padding: 0; margin: 0;
 	height: 1.5em;
 	left: 0.5em; right: 0.5em;
 	bottom: 0.5em;

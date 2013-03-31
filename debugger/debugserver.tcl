@@ -40,12 +40,21 @@ proc current_state {} {
 	list sources [array get sources]
 }
 
+proc g_con {} {
+	global g_con
+	if {![info exists g_con]} {
+		throw nack "No debug target connected"
+	}
+	set g_con
+}
+
 namespace eval m2req {
 	namespace export *
 	namespace ensemble create
 
-	proc connect seq {
+	proc connect {} {
 		global jmid
+		upvar seq seq
 		if {![info exists jmid]} {
 			set jmid	[m2 unique_id]
 			m2 chans register_chan $jmid [list apply {
@@ -68,29 +77,18 @@ namespace eval m2req {
 		m2 pr_jm $jmid $seq [current_state]
 	}
 
-	proc step seq {
-		global g_con
-		if {![info exists g_con]} {
-			throw nack "No debug target connected"
-		}
-
-		send $g_con n
-	}
-
-	proc command {seq cmd} {
-		global g_con
-		if {![info exists g_con]} {
-			throw nack "No debug target connected"
-		}
-
-		send $g_con r $cmd
-	}
+	proc step {}				{send [g_con] step}
+	proc command cmd			{send [g_con] exec $cmd}
+	proc instead script			{send [g_con] instead $cmd}
+	proc continue {}			{send [g_con] continue}
+	proc set_breakpoint from	{send [g_con] set_breakpoint $from}
+	proc clear_breakpoint from	{send [g_con] clear_breakpoint $from}
 }
 
 proc handle_req {seq data} {
 	try {
 		set rest	[lassign $data op]
-		m2req $op $seq {*}$rest
+		m2req $op {*}$rest
 	} on ok res {
 		m2 ack $seq $res
 	} trap nack errmsg {
@@ -139,6 +137,7 @@ proc cleanup_state {} {
 }
 
 proc send {con op args} {
+	log notice "Sending $op"
 	set msg	[concat [list $op] $args]
 	puts -nonewline $con [string length $msg]\n$msg
 }
@@ -154,18 +153,18 @@ proc readable con {
 	set type	[lindex $header 0]
 	set len		[lindex $header 1]
 	set dat		[read $con $len]
-	puts "len: ($len), read: ([string length $dat])"
 	if {[eof $con]} {
 		close $con
 		cleanup_state
 		return
 	}
+	log notice "Got $type"
 	switch -- $type {
-		s { # Source code
+		source { # Source code
 			set sources([lindex $dat 0])	[lindex $dat 1]
 			announce_sources
 		}
-		c { # About to run command
+		enter { # About to run command
 			set sid		[lindex $dat 0]
 			set from	[lindex $dat 1]
 			set to		[lindex $dat 2]
@@ -174,13 +173,13 @@ proc readable con {
 			#send $con r {clock seconds}
 			#after 1000 [list send $con n]
 		}
-		a { # Answer to a "r" query from us
+		answer { # Answer to a "r" query from us
 			set code	[lindex $dat 0]
 			set res		[lindex $dat 1]
-			puts "   got a: code: ($code), res: ($res)"
+			#puts "   got a: code: ($code), res: ($res)"
 			announce_event answer [list $code $res]
 		}
-		r { # Result of the just run command
+		leave { # Result of the just run command
 			try {
 				set sid		[lindex $dat 0]
 				set from	[lindex $dat 1]
@@ -191,10 +190,10 @@ proc readable con {
 				log error "Error unmarshalling dat: ($dat):\n$errmsg"
 			}
 			announce_event leave [list $sid $from $to $code $res]
-			puts "<- result: code: ($code), res: ($res)"
+			#puts "<- result: code: ($code), res: ($res)"
 		}
 		default {
-			puts stderr "Bad message type: ($type)"
+			log error "Bad message type: ($type)"
 		}
 	}
 }

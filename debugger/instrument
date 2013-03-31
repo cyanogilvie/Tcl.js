@@ -287,7 +287,7 @@ stdin.on('end', function(){
 		'	if {![info exists こ]} {\n'+
 		'		set こ [socket localhost 1234]\n'+
 		'		fconfigure [set こ] -blocking 1 -buffering none -translation binary\n'+
-		'		puts -nonewline [set こ] [てがみ s '+tcllist.to_tcl([[srckey, source]])+']\n'+
+		'		puts -nonewline [set こ] [てがみ source '+tcllist.to_tcl([[srckey, source]])+']\n'+
 		'	}\n'+
 		'	set こ\n'+
 		'}'], [parser.END, '\n']]
@@ -297,36 +297,41 @@ stdin.on('end', function(){
 		[[parser.SPACE, ' '], [parser.TXT, '{o e s}']],
 		[[parser.SPACE, ' '], [parser.TXT, '{\n'+
 		'	global __debug __breakpoints\n'+
+		//'	puts "する stepping $__debug(stepping), breakpoints: ([array names __breakpoints]), {[string range '+tcllist.to_tcl([source])+' $o [expr {$o+30}]]}"\n'+
 		'	if {[info exists __breakpoints($o)]} {\n'+
 		'		set __debug(stepping)	1\n'+
 		'		if {$__breakpoints($o) == "oneshot"} {array unset __breakpoints $o}\n'+
 		'	}\n'+
-		'	if {$__debug(stepping)} {
-		'		puts -nonewline [こ] [てがみ c [list '+srckey+' $o $e]]\n'+
-		'	}\n'+
-		'	while {1} {set msg [みる]\n'+
-		'		set op	[lindex $msg 0]\n'+
-		'		switch -- $op {\n'+
-		'			n break\n'+
-		'			r {set code [catch {uplevel 1 [lindex $msg 1]} res]; puts -nonewline [こ] [てがみ a [list $code $res]]}\n'+
-		'			i {set s [lindex $msg 1]}\n'+
-		'			b {set __breakpoints([lindex $msg 1]) 1}\n'+
-		'			x {array unset __breakpoints [lindex $msg 1]}\n'+
-		'			c {set __debug(stepping) 0; break}\n'+
+		'	if {$__debug(stepping)} {\n'+
+		'		puts -nonewline [こ] [てがみ enter [list '+srckey+' $o $e]]\n'+
+		'		while {1} {set msg [みる]\n'+
+		'			set op	[lindex $msg 0]\n'+
+		'			switch -- $op {\n'+
+		'				step break\n'+
+		'				exec {set code [catch {uplevel 1 [lindex $msg 1]} res]; puts -nonewline [こ] [てがみ answer [list $code $res]]}\n'+
+		'				instead {set s [lindex $msg 1]}\n'+
+		'				set_breakpoint {set __breakpoints([lindex $msg 1]) 1}\n'+
+		'				clear_breakpoint {array unset __breakpoints [lindex $msg 1]}\n'+
+		'				continue {set __debug(stepping) 0; break}\n'+
+		'			}\n'+
 		'		}\n'+
 		'	}\n'+
+		//'	puts "running command"\n'+
 		'	set code	[catch {uplevel 1 $s} res]\n'+
-		'	if {$__debug(stepping)} {\n'+
-		'		puts -nonewline [こ] [てがみ r [list '+srckey+' $o $e $code $res]]\n'+
+		'	if {$code == 1} {\n'+
+		'		set __debug(stepping) 1\n'+
 		'	}\n'+
-		'	while {1} {set msg [みる]\n'+
-		'		set op	[lindex $msg 0]\n'+
-		'		switch -- $op {\n'+
-		'			n break\n'+
-		'			r {set c [catch {uplevel 1 [lindex $msg 1]} r]; puts -nonewline [こ] [てがみ a [list $c $r]]}\n'+
-		'			b {set __breakpoints([lindex $msg 1]) 1}\n'+
-		'			x {array unset __breakpoints [lindex $msg 1]}\n'+
-		'			c {set __debug(stepping) 0; break}\n'+
+		'	if {$__debug(stepping)} {\n'+
+		'		puts -nonewline [こ] [てがみ leave [list '+srckey+' $o $e $code $res]]\n'+
+		'		while {1} {set msg [みる]\n'+
+		'			set op	[lindex $msg 0]\n'+
+		'			switch -- $op {\n'+
+		'				step break\n'+
+		'				exec {set c [catch {uplevel 1 [lindex $msg 1]} r]; puts -nonewline [こ] [てがみ answer [list $c $r]]}\n'+
+		'				set_breakpoint {set __breakpoints([lindex $msg 1]) 1}\n'+
+		'				clear_breakpoint {array unset __breakpoints [lindex $msg 1]}\n'+
+		'				continue {set __debug(stepping) 0; break}\n'+
+		'			}\n'+
 		'		}\n'+
 		'	}\n'+
 		'	switch -- $code {\n'+

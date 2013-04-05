@@ -331,6 +331,8 @@ function display_expr_token(token, parent) {
 		case parser.OPERAND: operand(); break;
 		case parser.OPERATOR: operator(); break;
 		case parser.SPACE:
+		case parser.LPAREN:
+		case parser.RPAREN:
 		case parser.SYNTAX: syntax(); break;
 		default:
 			throw new Error('Unexpected expr token type: '+token[1]+' ('+tokname(token[1])+')');
@@ -347,8 +349,6 @@ function display_expr_token(token, parent) {
 		switch (token[1]) {
 			case parser.SCRIPT:	script(); break;
 			case parser.VAR:	variable(); break;
-			case parser.LPAREN:
-			case parser.RPAREN:	syntax(); break;
 			case parser.FLOAT:
 			case parser.INTEGER:
 			case parser.BOOL:	literal(); break;

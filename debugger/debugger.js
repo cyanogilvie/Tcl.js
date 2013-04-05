@@ -44,7 +44,9 @@ var EXPRARG = parser.EXPRARG,
 			switch (wordtext) {
 				case 'then':
 				case 'else':
+					break;
 				case 'elseif':
+					special.push(++p, EXPRARG);
 					break;
 				default:
 					if (wordtext != null) {
@@ -78,6 +80,16 @@ function initialize_state(data) {
 	scripts = tcllist.list2dict(state.scripts);
 }
 
+function instead(substitute_script) {
+	send('instead', substitute_script, 'Error sending instead request');
+}
+
+function start_debug(scrid, source) {
+	scripts[scrid] = source;
+	instead(instrument_script(source));
+	step_into();
+}
+
 function scrollIntoViewMiddle(node) {
 	var view = dom.byId('marked_up_display'),
 		documentOffsetTop = node.offsetTop;
@@ -86,12 +98,11 @@ function scrollIntoViewMiddle(node) {
 }
 
 function show_location(scrid, start, end) {
-	if (!stepping) return;
-
 	if (current_script !== scrid) {
 		load_script(scrid);
-		current_script = scrid;
 	}
+	if (!stepping) return;
+
 	console.log('show_location: '+scrid+','+start+','+end);
 	dynStyleNode.innerHTML = '#cmd_'+start+'-'+end+' {outline: 1px dashed red; background: #400;}';
 	dom.byId('cmd_'+start+'-'+end).scrollIntoView();
@@ -142,12 +153,7 @@ function leave(scrid, start, end, code, res) {
 }
 
 function step() {
-	m2.rsj_req(debugger_jmid[0], 'step', function(msg){
-		if (msg.type === 'nack') {
-			log.error('Error sending step request: '+msg.data);
-			alert('Error sending step request: '+msg.data);
-		}
-	});
+	send('step', 'Error sending step request');
 }
 
 function pause() {
@@ -155,12 +161,8 @@ function pause() {
 }
 
 function run() {
-	m2.rsj_req(debugger_jmid[0], 'continue', function(msg){
-		if (msg.type === 'back') {
-			alert('Error sending continue request: '+msg.data);
-		}
-	});
-	stepping = false;
+	send('continue', 'Error sending continue request');
+	//stepping = false;
 	depth_trigger = null;
 }
 
@@ -179,25 +181,28 @@ function step_out() {
 	step();
 }
 
+function send() {
+	var args = Array.prototype.slice.call(arguments),
+		errprefix = args.pop(), list = tcllist.array2list(args);
+	log.notice('Sending "'+list+'"');
+	m2.rsj_req(debugger_jmid[0], list, function(msg){
+		if (msg.type == 'nack') {
+			alert(errprefix+': '+msg.data);
+		}
+	});
+}
+
 function toggle_breakpoint(scrid, from, to) {
 	var key = scrid+','+from+','+to, nodeid = 'cmd_'+from+'-'+to;
 	console.log('toggle_breakpoint, nodeid: "'+nodeid+'"');
 	if (breakpoints[key] == null) {
 		console.log('Sending "set_breakpoint '+from+'"');
-		m2.rsj_req(debugger_jmid[0], 'set_breakpoint '+from, function(msg){
-			if (msg.type == 'nack') {
-				alert('Error setting breakpoint: '+msg.data);
-			}
-		});
+		send('set_breakpoint', from, 'Error setting breakpoint');
 		breakpoints[key] = true;
 		console.log('Adding breakpoint class to ', nodeid);
 		domClass.add(nodeid, 'breakpoint');
 	} else {
-		m2.rsj_req(debugger_jmid[0], 'clear_breakpoint '+from, function(msg){
-			if (msg.type == 'nack') {
-				alert('Error removing breakpoint: '+msg.data);
-			}
-		});
+		send('clear_breakpoint', from, 'Error removing breakpoint');
 		delete breakpoints[key];
 		console.log('Removing breakpoint class from ', nodeid);
 		domClass.remove(nodeid, 'breakpoint');
@@ -206,13 +211,7 @@ function toggle_breakpoint(scrid, from, to) {
 
 function console_command(cmd) {
 	dom.create('div', {className: 'question'}, dom.byId('console_result'), '> '+cmd).scrollIntoView(false);
-	m2.rsj_req(debugger_jmid[0], tcllist.to_tcl(['command', cmd]), function(msg){
-		switch (msg.type) {
-			case 'nack':
-				log.error('Error sending console command: '+msg.data);
-				alert('Error sending console command: '+msg.data);
-		}
-	});
+	send('command', cmd, 'Error sending console command');
 }
 
 function command_answer(code, res) {
@@ -225,20 +224,21 @@ function update_state(data) {
 	for (i=0; i<updates.length; i+=2) {
 		k = updates[i];
 		v = updates[i+1];
+		details = tcllist.list2array(v);
 		switch (k) {
+			case 'start_debug':
+				start_debug(details[0], details[1]);
+				break;
 			case 'sources_update':
-				scripts = tcllist.list2dict(v);
+				scripts = tcllist.list2dict(details[0]);
 				break;
 			case 'enter':
-				details = tcllist.list2array(v);
 				enter(details[0], details[1], details[2]);
 				break;
 			case 'leave':
-				details = tcllist.list2array(v);
 				leave(details[0], details[1], details[2], details[3], details[4]);
 				break;
 			case 'answer':
-				details = tcllist.list2array(v);
 				command_answer(details[0], details[1]);
 				break;
 			case 'done':
@@ -431,6 +431,122 @@ function parse_script(script_str, scrid) {
 	}
 }
 
+function reconstitute_expr(tokens) {
+	var i, txt='';
+	for (i=0; i<tokens.length; i++) {
+		txt += tokens[i][3];
+	}
+	return txt;
+}
+
+function reconstitute_word(word) {
+	var script='', k, token;
+	for (k=0; k<word.length; k++) {
+		token = word[k];
+		switch (token[0]) {
+			case parser.SCRIPT:
+				script += reconstitute(token[1]);
+				break;
+			case parser.SCRIPTARG:
+				script += reconstitute(token[2][1]);
+				break;
+			case parser.EXPRARG:
+				script += reconstitute_expr(token[2]);
+				break;
+			case parser.INDEX:
+				script += reconstitute_word(token[1]);
+				break
+			default:
+				script += token[1];
+		}
+	}
+	return script;
+}
+
+function reconstitute(commands) {
+	var i, j, k, script='', command, word, token;
+
+	for (i=0; i<commands.length; i++) {
+		command = commands[i];
+		for (j=0; j<command.length; j++) {
+			word = command[j];
+			script += reconstitute_word(word);
+		}
+	}
+
+	return script;
+}
+
+function instrument(commands) {
+	var i,j,k,l,m, script='', command, newcommand, word, token, outcommands=[], endtok, cmdofs, cmdendofs;
+
+	for (i=0; i<commands.length; i++) {
+		command = commands[i];
+		cmdofs = null;
+		for (j=0; j<command.length; j++) {
+			word = command[j];
+			for (k=0; k<word.length; k++) {
+				token = word[k];
+				if (token[0] !== parser.SPACE && token[0] !== parser.COMMENT && cmdofs == null) {
+					cmdofs = token[3];
+				}
+				switch (token[0]) {
+					case parser.SCRIPT:
+						token[1] = instrument(token[1]);
+						break;
+					case parser.SCRIPTARG:
+						token[2][1] = instrument(token[2][1]);
+						break;
+					case parser.EXPRARG:
+						for (l=0; l<token[2].length; l++) {
+							if (token[2][l][0] !== parser.OPERAND) continue;
+							switch (token[2][l][1]) {
+								case parser.SCRIPT:
+									token[2][l][2][1] = instrument(token[2][l][2][1]);
+									token[2][l][3] = reconstitute(token[2][l][2][1]);
+									break;
+								case parser.QUOTED:
+									for (m=0; m<token[2][l][2].length; m++) {
+										if (token[2][l][2][m][0] === parser.SCRIPT) {
+											token[2][l][2][m][1] = instrument(token[2][l][2][m][1]);
+										}
+									}
+									break;
+							}
+						}
+						break;
+					case parser.END:
+						endtok = word.pop();
+						/*
+						endtok = token.slice();
+						word[k] = [parser.SYNTAX, ''];
+						*/
+				}
+				if (token[0] !== parser.END) {
+					cmdendofs = token[3] + token[1].length-1;
+				}
+			}
+		}
+		if (real_words(command).length === 0) {
+			outcommands.push(command);
+		} else {
+			newcommand = [
+				[[parser.TXT, 'する']],
+				[[parser.SPACE, ' '], [parser.TXT, cmdofs]],
+				[[parser.SPACE, ' '], [parser.TXT, cmdendofs]],
+				[[parser.SPACE, ' '], [parser.TXT, tcllist.array2list([reconstitute([command])])], endtok],
+			];
+			outcommands.push(newcommand);
+		}
+	}
+
+	return outcommands;
+}
+
+function instrument_script(source) {
+	return reconstitute(instrument(parse_script(source)[1]));
+}
+
 function visualize_space(str) {
 	return str.replace(
 		/\n/g, '\u23ce'
@@ -572,6 +688,8 @@ function display_expr_token(token) {
 		case parser.OPERAND: operand(); break;
 		case parser.OPERATOR: operator(); break;
 		case parser.SPACE:
+		case parser.LPAREN:
+		case parser.RPAREN:
 		case parser.SYNTAX: syntax(); break;
 		default:
 			throw new Error('Unexpected expr token type: '+token[1]+' ('+tokname(token[1])+')');
@@ -583,8 +701,6 @@ function display_expr_token(token) {
 		switch (token[1]) {
 			case parser.SCRIPT:	script(); break;
 			case parser.VAR:	variable(); break;
-			case parser.LPAREN:
-			case parser.RPAREN:	syntax(); break;
 			case parser.FLOAT:
 			case parser.INTEGER:
 			case parser.BOOL:	literal(); break;
@@ -639,6 +755,7 @@ function display_script_tokens(parsed, scrid) {
 
 function load_script(scrid) {
 	parse_script(scripts[scrid], scrid);
+	current_script = scrid;
 }
 
 dom.onclick('continue', run);
@@ -663,6 +780,4 @@ on(dom.byId('marked_up_display'), '.command:click', function(){
 		this.getAttribute('data-to')
 	);
 });
-
-//load_script('puts "hello, world"');
 });

@@ -1,5 +1,4 @@
 /*global define */
-/*jslint nomen: true, plusplus: true, white: true, browser: true, node: true, newcap: true, continue: true */
 
 define([
 	'./types'
@@ -8,8 +7,7 @@ define([
 ){
 "use strict";
 
-var problem_chars = /[ "{}$;\t\f\n\r\v\[\]]/,
-	hex_chars = /[\dabcdefABCDEF]/,
+var hex_chars = /[\dabcdefABCDEF]/,
 	whitespace = /\s/;
 
 // Exceptions <<<
@@ -404,40 +402,41 @@ function parse_tcl_list(str) { //<<<
 }
 
 //>>>
-function serialize_tcl_list(arr) { //<<<
-	// for now...
-	var i, staged, elem;
-	staged = [];
-	for (i=0; i<arr.length; i++) {
-		elem = String(arr[i]);
-		if (
-			elem.length > 0 &&
-			problem_chars.test(elem) === false
-		) {
-			if (elem.indexOf('\\') === -1) {
-				staged.push(elem);
-			} else {
-				// Replace all \ with \\
-				staged.push(elem.replace(/\\/g, '\\\\'));	// WARNING: flags are a spidermonkey extension
+function quote_elem(elem) { //<<<
+	var m, c, depth;
+
+	elem = String(elem);
+	if (elem.length === 0) {
+		return '{}';
+	} else if (!/^[{"]/.test(elem) && /[ \t\f\n\r\v]/.test(elem) === false) {
+		return elem.replace(/\\/g, '\\\\');
+	} else if ((m = /\\+$/.exec(elem)) && m[0].length % 2 === 1) {
+		// There is an odd number of \ characters at end of elem, can't
+		// brace quote
+		return elem.replace(/[\\ \t\f\n\r\v{}"]/g, '\\$&');
+	} else if (!/{|}/.test(elem)) {
+		return '{'+elem+'}';
+	} else {
+		depth = 0;
+		for (c=0; c<elem.length; c++) {
+			switch (elem.charAt(c)) {
+				case '\\': c++; break;
+				case '{': depth++; break;
+				case '}': depth++; break;
 			}
-		} else {
-			if (
-				elem.indexOf('}') === -1 &&
-				elem.indexOf('{') === -1 &&
-				elem.charAt(elem.length-1) !== '\\') {
-				staged.push('{'+elem+'}');
-			} else {
-				// Replace all <special> with \<special>
-				elem = elem.replace(/\\| |"|\[|\]|\}|\{|\$|;/g, '\\$&');	// WARNING: flags are a spidermonkey extension
-				elem = elem.replace(/\n/g, '\\n');	// WARNING: flags are a spidermonkey extension
-				elem = elem.replace(/\r/g, '\\r');	// WARNING: flags are a spidermonkey extension
-				elem = elem.replace(/\f/g, '\\f');	// WARNING: flags are a spidermonkey extension
-				elem = elem.replace(/\t/g, '\\t');	// WARNING: flags are a spidermonkey extension
-				//elem = elem.replace('/'+String.fromCharCode(0xb)+'/g', '\\v');	// WARNING: flags are a spidermonkey extension
-				elem = elem.replace(/\v/g, '\\v');	// WARNING: flags are a spidermonkey extension
-				staged.push(elem);
+			if (depth < 0) {
+				return elem.replace(/[\\ \t\f\n\r\v{}"]/g, '\\$&');
 			}
 		}
+		return '{'+elem+'}';
+	}
+}
+
+//>>>
+function serialize_tcl_list(arr) { //<<<
+	var i, staged = new Array(arr.length);
+	for (i=0; i<arr.length; i++) {
+		staged[i] = quote_elem(arr[i]);
 	}
 	return staged.join(' ');
 }
@@ -474,39 +473,6 @@ function dict2list(dict) { //<<<
 
 //>>>
 
-function quote_elem(elem) { //<<<
-	elem = String(elem);
-	if (
-		elem.length > 0 &&
-		problem_chars.test(elem) === false
-	) {
-		if (elem.indexOf('\\') === -1) {
-			return elem;
-		} else {
-			// Replace all \ with \\
-			return elem.replace(/\\/g, '\\\\');	// WARNING: flags are a spidermonkey extension
-		}
-	} else {
-		if (
-			elem.indexOf('}') === -1 &&
-			elem.indexOf('{') === -1 &&
-			elem.charAt(elem.length-1) !== '\\') {
-			return '{'+elem+'}';
-		} else {
-			// Replace all <special> with \<special>
-			elem = elem.replace(/\\| |"|\[|\]|\}|\{|\$|;/g, '\\$&');	// WARNING: flags are a spidermonkey extension
-			elem = elem.replace(/\n/g, '\\n');	// WARNING: flags are a spidermonkey extension
-			elem = elem.replace(/\r/g, '\\r');	// WARNING: flags are a spidermonkey extension
-			elem = elem.replace(/\f/g, '\\f');	// WARNING: flags are a spidermonkey extension
-			elem = elem.replace(/\t/g, '\\t');	// WARNING: flags are a spidermonkey extension
-			//elem = elem.replace('/'+String.fromCharCode(0xb)+'/g', '\\v');	// WARNING: flags are a spidermonkey extension
-			elem = elem.replace(/\v/g, '\\v');	// WARNING: flags are a spidermonkey extension
-			return elem;
-		}
-	}
-}
-
-//>>>
 function to_tcl(from) { //<<<
 	var i, e, staged;
 
@@ -542,11 +508,9 @@ function to_tcl(from) { //<<<
 			return String(from);
 		case 'string':
 			return from;
-			break;
 
 		default:
-			console.error('Cannot convert type: ', typeof from);
-			break;
+			throw new Error('Cannot convert type: ' + typeof from);
 	}
 }
 

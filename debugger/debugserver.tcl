@@ -55,6 +55,7 @@ namespace eval m2req {
 	proc connect {} {
 		global jmid
 		upvar seq seq
+		log debug "F got connect"
 		if {![info exists jmid]} {
 			set jmid	[m2 unique_id]
 			m2 chans register_chan $jmid [list apply {
@@ -79,7 +80,7 @@ namespace eval m2req {
 
 	proc step {}				{send [g_con] step}
 	proc command cmd			{send [g_con] exec $cmd}
-	proc instead script			{send [g_con] instead $cmd}
+	proc instead script			{send [g_con] instead $script}
 	proc continue {}			{send [g_con] continue}
 	proc set_breakpoint from	{send [g_con] set_breakpoint $from}
 	proc clear_breakpoint from	{send [g_con] clear_breakpoint $from}
@@ -88,6 +89,7 @@ namespace eval m2req {
 proc handle_req {seq data} {
 	try {
 		set rest	[lassign $data op]
+		log debug "F got $op"
 		m2req $op {*}$rest
 	} on ok res {
 		m2 ack $seq $res
@@ -138,7 +140,7 @@ proc cleanup_state {} {
 
 proc send {con op args} {
 	log notice "Sending $op"
-	set msg	[concat [list $op] $args]
+	set msg	[encoding convertto utf-8 [concat [list $op] $args]]
 	puts -nonewline $con [string length $msg]\n$msg
 }
 
@@ -152,7 +154,7 @@ proc readable con {
 	}
 	set type	[lindex $header 0]
 	set len		[lindex $header 1]
-	set dat		[read $con $len]
+	set dat		[encoding convertfrom utf-8 [read $con $len]]
 	if {[eof $con]} {
 		close $con
 		cleanup_state
@@ -160,6 +162,10 @@ proc readable con {
 	}
 	log notice "Got $type"
 	switch -- $type {
+		start_debug {
+			puts "Sending on [list start_debug [lindex $dat 0]]"
+			announce_event start_debug [list [lindex $dat 0] [lindex $dat 1]]
+		}
 		source { # Source code
 			set sources([lindex $dat 0])	[lindex $dat 1]
 			announce_sources

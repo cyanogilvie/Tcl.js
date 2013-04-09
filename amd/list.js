@@ -422,7 +422,7 @@ function quote_elem(elem) { //<<<
 			switch (elem.charAt(c)) {
 				case '\\': c++; break;
 				case '{': depth++; break;
-				case '}': depth++; break;
+				case '}': depth--; break;
 			}
 			if (depth < 0) {
 				return elem.replace(/[\\ \t\f\n\r\v{}"]/g, '\\$&');

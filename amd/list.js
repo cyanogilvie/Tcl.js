@@ -428,6 +428,9 @@ function quote_elem(elem) { //<<<
 				return elem.replace(/[\\ \t\f\n\r\v{}"]/g, '\\$&');
 			}
 		}
+		if (depth > 0) {
+			return elem.replace(/[\\ \t\f\n\r\v{}"]/g, '\\$&');
+		}
 		return '{'+elem+'}';
 	}
 }

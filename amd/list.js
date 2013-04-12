@@ -9,9 +9,7 @@ define([
 
 var hex_chars = /[\dabcdefABCDEF]/,
 	whitespace = /\s/,
-	backquotechars = /[\\ \t\f\n\r\v{}"]/g,
-	// These extra chars ([]$;) don't strictly need to be escaped
-	//backquotechars = /[\\ \t\f\n\r\v{}"\[\]$;]/g,
+	backquotechars = /[\\ \t\f\n\r\v{}"\[\]$;]/g,
 	backquotemap = {
 		'\t': 't',
 		'\f': 'f',
@@ -23,8 +21,6 @@ var hex_chars = /[\dabcdefABCDEF]/,
 		'{': '{',
 		'}': '}',
 		'"': '"',
-
-		// Not used
 		'[': '[',
 		']': ']',
 		'$': '$',
@@ -427,16 +423,21 @@ function quote_elem(elem) { //<<<
 	var m, c, depth;
 
 	elem = String(elem);
+
+	function backquote(){
+		return elem.replace(backquotechars, function(match){
+			return '\\'+backquotemap[match];
+		});
+	}
+
 	if (elem.length === 0) {
 		return '{}';
-	} else if (!/^[{"]/.test(elem) && /[ \t\f\n\r\v]/.test(elem) === false) {
+	} else if (!/^[{"]/.test(elem) && /[ \t\f\n\r\v\[\]$;]/.test(elem) === false) {
 		return elem.replace(/\\/g, '\\\\');
 	} else if ((m = /\\+$/.exec(elem)) && m[0].length % 2 === 1) {
 		// There is an odd number of \ characters at end of elem, can't
 		// brace quote
-		return elem.replace(backquotechars, function(match){
-			return '\\'+backquotemap[match];
-		});
+		return backquote();
 
 	} else if (!/{|}/.test(elem)) {
 		return '{'+elem+'}';
@@ -449,15 +450,11 @@ function quote_elem(elem) { //<<<
 				case '}': depth--; break;
 			}
 			if (depth < 0) {
-				return elem.replace(backquotechars, function(match){
-					return '\\'+backquotemap[match];
-				});
+				return backquote();
 			}
 		}
 		if (depth > 0) {
-			return elem.replace(backquotechars, function(match){
-				return '\\'+backquotemap[match];
-			});
+			return backquote();
 		}
 		return '{'+elem+'}';
 	}

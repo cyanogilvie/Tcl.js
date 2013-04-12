@@ -8,7 +8,28 @@ define([
 "use strict";
 
 var hex_chars = /[\dabcdefABCDEF]/,
-	whitespace = /\s/;
+	whitespace = /\s/,
+	backquotechars = /[\\ \t\f\n\r\v{}"]/g,
+	// These extra chars ([]$;) don't strictly need to be escaped
+	//backquotechars = /[\\ \t\f\n\r\v{}"\[\]$;]/g,
+	backquotemap = {
+		'\t': 't',
+		'\f': 'f',
+		'\n': 'n',
+		'\r': 'r',
+		'\v': 'v',
+		'\\': '\\',
+		' ': ' ',
+		'{': '{',
+		'}': '}',
+		'"': '"',
+
+		// Not used
+		'[': '[',
+		']': ']',
+		'$': '$',
+		';': ';'
+	};
 
 // Exceptions <<<
 function ParseError(message) {
@@ -413,7 +434,10 @@ function quote_elem(elem) { //<<<
 	} else if ((m = /\\+$/.exec(elem)) && m[0].length % 2 === 1) {
 		// There is an odd number of \ characters at end of elem, can't
 		// brace quote
-		return elem.replace(/[\\ \t\f\n\r\v{}"]/g, '\\$&');
+		return elem.replace(backquotechars, function(match){
+			return '\\'+backquotemap[match];
+		});
+
 	} else if (!/{|}/.test(elem)) {
 		return '{'+elem+'}';
 	} else {
@@ -425,11 +449,15 @@ function quote_elem(elem) { //<<<
 				case '}': depth--; break;
 			}
 			if (depth < 0) {
-				return elem.replace(/[\\ \t\f\n\r\v{}"]/g, '\\$&');
+				return elem.replace(backquotechars, function(match){
+					return '\\'+backquotemap[match];
+				});
 			}
 		}
 		if (depth > 0) {
-			return elem.replace(/[\\ \t\f\n\r\v{}"]/g, '\\$&');
+			return elem.replace(backquotechars, function(match){
+				return '\\'+backquotemap[match];
+			});
 		}
 		return '{'+elem+'}';
 	}

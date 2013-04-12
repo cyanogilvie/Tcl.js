@@ -25,6 +25,7 @@ cflib::config create cfg $argv {
 	variable uri		tcp://
 	variable debug		0
 	variable loglevel	notice
+	variable exectraces	exectraces
 }
 if {[cfg @debug]} {
 	proc ?? script {uplevel 1 $script}
@@ -32,6 +33,8 @@ if {[cfg @debug]} {
 	proc ?? args {}
 }
 logging::logger ::log [cfg @loglevel]
+
+set here	[file dirname [file normalize [info script]]]
 
 m2::api2 create m2 -uri [cfg @uri]
 
@@ -144,6 +147,15 @@ proc send {con op args} {
 	puts -nonewline $con [string length $msg]\n$msg
 }
 
+proc save_exectrace exectrace {
+	set now	[clock microseconds]
+	set fn	[file normalize [file join [cfg @exectraces] $now.exectrace]]
+	if {![file exists [file dirname $fn]]} {
+		file mkdir [file dirname $fn]
+	}
+	cflib::writefile $fn $exectrace
+}
+
 proc readable con {
 	global sources
 	set header	[gets $con]
@@ -197,6 +209,9 @@ proc readable con {
 			}
 			announce_event leave [list $sid $from $to $code $res]
 			#puts "<- result: code: ($code), res: ($res)"
+		}
+		exectrace { # Log of the execution trace
+			save_exectrace [lindex $dat 0]
 		}
 		default {
 			log error "Bad message type: ($type)"

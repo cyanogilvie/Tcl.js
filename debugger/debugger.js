@@ -86,7 +86,7 @@ function instead(substitute_script) {
 
 function start_debug(scrid, source) {
 	scripts[scrid] = source;
-	instead(instrument_script(source));
+	instead(instrument_script(source, scrid));
 	step_into();
 }
 
@@ -477,7 +477,7 @@ function reconstitute(commands) {
 	return script;
 }
 
-function instrument(commands) {
+function instrument(commands, scrid) {
 	var i,j,k,l,m, script='', command, newcommand, word, token, outcommands=[], endtok, cmdofs, cmdendofs;
 
 	for (i=0; i<commands.length; i++) {
@@ -492,23 +492,23 @@ function instrument(commands) {
 				}
 				switch (token[0]) {
 					case parser.SCRIPT:
-						token[1] = instrument(token[1]);
+						token[1] = instrument(token[1], scrid);
 						break;
 					case parser.SCRIPTARG:
-						token[2][1] = instrument(token[2][1]);
+						token[2][1] = instrument(token[2][1], scrid);
 						break;
 					case parser.EXPRARG:
 						for (l=0; l<token[2].length; l++) {
 							if (token[2][l][0] !== parser.OPERAND) continue;
 							switch (token[2][l][1]) {
 								case parser.SCRIPT:
-									token[2][l][2][1] = instrument(token[2][l][2][1]);
-									token[2][l][3] = reconstitute(token[2][l][2][1]);
+									token[2][l][2][1] = instrument(token[2][l][2][1], scrid);
+									token[2][l][3] = reconstitute(token[2][l][2][1], scrid);
 									break;
 								case parser.QUOTED:
 									for (m=0; m<token[2][l][2].length; m++) {
 										if (token[2][l][2][m][0] === parser.SCRIPT) {
-											token[2][l][2][m][1] = instrument(token[2][l][2][m][1]);
+											token[2][l][2][m][1] = instrument(token[2][l][2][m][1], scrid);
 										}
 									}
 									break;
@@ -534,6 +534,7 @@ function instrument(commands) {
 				[[parser.TXT, 'する']],
 				[[parser.SPACE, ' '], [parser.TXT, cmdofs]],
 				[[parser.SPACE, ' '], [parser.TXT, cmdendofs]],
+				[[parser.SPACE, ' '], [parser.TXT, scrid]],
 				[[parser.SPACE, ' '], [parser.TXT, tcllist.array2list([reconstitute([command])])], endtok],
 			];
 			outcommands.push(newcommand);
@@ -543,8 +544,8 @@ function instrument(commands) {
 	return outcommands;
 }
 
-function instrument_script(source) {
-	return reconstitute(instrument(parse_script(source)[1]));
+function instrument_script(source, scrid) {
+	return reconstitute(instrument(parse_script(source)[1], scrid));
 }
 
 function visualize_space(str) {
@@ -599,6 +600,8 @@ function display_token(token, scrid) {
 				from = null;
 				if (real_words(command).length > 0) {
 					commandspan = push_marked_up_parent({className: 'command'});
+				} else {
+					commandspan = push_marked_up_parent({});
 				}
 				for (j=0; j<command.length; j++) {
 					if (j === 0) {
@@ -642,6 +645,8 @@ function display_token(token, scrid) {
 					if (breakpoints[scrid+','+from+','+to] != null) {
 						domClass.add(commandspan, 'breakpoint');
 					}
+				} else {
+					marked_up_parent.pop();
 				}
 			}
 			newnode = commandspan;

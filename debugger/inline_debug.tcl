@@ -1,9 +1,62 @@
-proc debug script {
+proc exectrace args { #<<<
+	set script		[lindex $args end]
+	array set opts	[lrange $args 0 [expr {[llength $args]-2}]]
+
+	global __debug
+
+	if {![info exists __debug(scrid_seq)]} {
+		set __debug(scrid_seq)	0
+		set __debug(exectrace)	{}
+	}
+	set scrid				[incr __debug(scrid_seq)]
+	set __debug(scripts,$scrid)	$script
+
+	if {![info exists __debug(initialized)]} {
+		proc する {from to scrid script} {
+			global __debug
+
+			lappend __debug(exectrace)	[list $from $to $scrid]
+
+			# Emit enter event
+
+			set code	[catch {uplevel 1 $script} res]
+
+			# Emit leave event
+
+			return -code $code $res
+		}
+		set __debug(initialized)	1
+	}
+
+	# Instrument script
+
+	set code	[catch {uplevel 1 $script} res]
+
+	if {$__debug(exectrace) != ""} {
+		# Save exectrace
+	}
+	return -code $code $res
+}
+
+#>>>
+proc debug args { #<<<
+	set script		[lindex $args end]
+	array set opts	[lrange $args 0 [expr {[llength $args]-2}]]
+
 	global __breakpoints __debug
 
 	array set __breakpoints {}
 	set __debug(stepping)	1
-	set srcid				[expr {int(rand()*2**20)}]
+	if {![info exists __debug(scrid_seq)]} {
+		set __debug(scrid_seq)	0
+		set __debug(exectrace)	{}
+		set __debug(tracing)	0
+	}
+	if {[info exists opts(-trace)] && $opts(-trace)} {
+		set __debug(tracing)	1
+	}
+	set scrid				[incr $__debug(scrid_seq)]
+	set __debug(scripts,$scrid)	$script
 
 	if {![info exists __debug(initialized)]} {
 		if {[info commands encoding] == "encoding"} {
@@ -41,8 +94,12 @@ proc debug script {
 			set こ
 		}
 
-		proc する {from to script} [format {
+		proc する {from to scrid script} {
 			global __debug __breakpoints
+
+			if {$__debug(tracing)} {
+				lappend __debug(exectrace)	[list $from $to $scrid]
+			}
 
 			if {[info exists __breakpoints($from)]} {
 				set __debug(stepping)	1
@@ -54,7 +111,7 @@ proc debug script {
 			}
 
 			if {$__debug(stepping)} {
-				はなす enter {%1$s} $from $to
+				はなす enter $scrid $from $to
 				while 1 {
 					set msg [みる]
 					if {[eof [こ]]} {
@@ -93,7 +150,7 @@ proc debug script {
 				set __debug(stepping) 1
 			}
 			if {$__debug(stepping)} {
-				はなす leave {%1$s} $from $to $code $res
+				はなす leave $scrid $from $to $code $res
 				while 1 {
 					set msg [みる]
 					if {[eof [こ]]} {
@@ -123,12 +180,11 @@ proc debug script {
 				}
 			}
 			return -code $code $res
-		} [list $srcid]]
+		}
 		set __debug(initialized)	1
 	}
 
-	puts "sending start_debug [list $srcid $script]"
-	はなす start_debug $srcid $script
+	はなす start_debug $scrid $script
 	while 1 {
 		set msg	[みる]
 		if {[eof [こ]]} {
@@ -160,7 +216,12 @@ proc debug script {
 		}
 	}
 	set code	[catch {uplevel 1 $script} res]
+	if {$__debug(exectrace) != ""} {
+		はなす exectrace [array get __debug]
+	}
 	return -code $code $res
 }
+
+#>>>
 
 # vim: ft=tcl foldmethod=marker foldmarker=<<<,>>> ts=4 shiftwidth=4

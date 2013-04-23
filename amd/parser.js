@@ -30,6 +30,7 @@ var iface, e,
 	BRACED		= 22,
 	SCRIPTARG	= 24,
 	EXPRARG		= 25,
+	SUBSTARG	= 26,
 	t = {
 		TEXT	: TEXT,
 		SPACE	: SPACE,
@@ -57,7 +58,8 @@ var iface, e,
 		BRACED		: BRACED,
 
 		SCRIPTARG	: SCRIPTARG,
-		EXPRARG		: EXPRARG
+		EXPRARG		: EXPRARG,
+		SUBSTARG	: SUBSTARG
 	}, operators = [
 		/^(?:~|!(?=[^=]))/,	1,
 		/^\*\*/,			2,
@@ -738,6 +740,27 @@ function parse(text, mode, ofs) {
 		case 'expr':
 			parse_subexpr();
 			return tokens;
+		case 'subst':
+			while (i < text.length) {
+				switch (text[i]) {
+					case '\\':
+						parse_escape();
+						break;
+
+					case '$':
+						parse_variable();
+						break;
+
+					case '[':
+						parse_commands();
+						break;
+
+					default:
+						token += text[i++];
+						break;
+				}
+			}
+			return tokens;
 		default:
 			throw new Error('Invalid parse mode: "'+mode+'"');
 	}
@@ -752,6 +775,10 @@ function parse_script(text, ofs) {
 
 function parse_expr(text, ofs) {
 	return parse(text, 'expr', ofs);
+}
+
+function parse_subst(text, ofs) {
+	return parse(text, 'subst', ofs);
 }
 
 function expr2stack(expr) {
@@ -809,6 +836,7 @@ function expr2stack(expr) {
 iface = {
 	'parse_script': parse_script,
 	'parse_expr': parse_expr,
+	'parse_subst': parse_subst,
 	'expr2stack': expr2stack,
 	'ParseError': ParseError,
 	'tokenname': {}

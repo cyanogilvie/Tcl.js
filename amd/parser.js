@@ -576,6 +576,12 @@ function parse(text, mode, ofs) {
 
 		while (text[i] !== undefined) {
 			here = text.substr(i);
+			// line folds
+			if (m = /^\\\n\s+/.exec(here)) {
+				emit_token(SPACE, m[0]);
+				continue;
+			}
+
 			// whitespace
 			if (m = /^\s+/.exec(here)) {
 				emit_token(SPACE, m[0]);
@@ -768,7 +774,7 @@ function parse(text, mode, ofs) {
 
 function parse_script(text, ofs) {
 	// First unfold - happens even in brace quoted words
-	// This has been pushed down to parse_escape and parse_braced
+	// This has been pushed down to parse_escape, parse_braced and parse_subexpr
 	//text = text.replace(/\\\n\s*/g, ' ');
 	return parse(text, 'script', ofs);
 }

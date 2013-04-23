@@ -260,7 +260,6 @@ function process_files(files) {
 	function next_file() {
 		var fn = files[i++];
 		if (fn === undefined) {return;}
-		console.log('Processing file: '+fn);
 
 		fs.readFile(fn, 'utf8', function(err, data){
 			if (err) {

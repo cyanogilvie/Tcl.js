@@ -469,7 +469,7 @@ function parse(text, mode, ofs) {
 
 		// Consume any leading whitespace / comments if first word
 		while (
-			text[i] === '#' ||
+			(first && text[i] === '#') ||
 			(m = re.exec(text.substr(i)))
 		) {
 			if (m) {

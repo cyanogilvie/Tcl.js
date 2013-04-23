@@ -12,14 +12,14 @@ proc readfile fn { #<<<
 }
 
 #>>>
-coroutine proc_info [list apply {
-	cmd {
-		set procs	[readfile ~/git/nsadmin/procs]
+coroutine proc_info apply {
+	{} {
+		set procs	[readfile procs]
 		set res		""
 		while {1} {
 			lassign [yeildto return -level 0 $res] cmd
 
-			set res	[lsearch -all -inline -index 1 $procs $cmd]
+			set res	[lrange [lsearch -all -inline -index 0 $procs $cmd] 1 end]
 		}
 	}
 }
@@ -76,10 +76,17 @@ proc scan_range {fn from to re} { #<<<
 			puts stderr "Could not parse allcommands.js output line: ($line)"
 			continue
 		}
-		lassign [proc_info $cmd] proc_fn proc_from proc_to
 		if {![dict exists $scanned $cmd]} {
-			scan_range $proc_fn $from_from $proc_to
-			dict set scanned $cmd	1
+			set hits	[proc_info $cmd]
+			if {[llength $hits] == 0} {
+				puts stderr "No definition found for command \"$cmd\""
+			}
+			foreach hit $hits {
+				lassign $hit proc_fn proc_line proc_ofs proc_chars
+				lassign $proc_chars proc_from proc_to
+				scan_range $proc_fn $from_from $proc_to
+				dict set scanned $cmd	1
+			}
 		}
 	}
 }

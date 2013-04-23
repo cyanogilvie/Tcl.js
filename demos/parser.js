@@ -19,6 +19,7 @@ require([
 
 var EXPRARG = parser.EXPRARG,
 	SCRIPTARG = parser.SCRIPTARG,
+	SUBSTARG = parser.SUBSTARG,
 	marked_up_parent,
 	dynStyleNode = dom.create('style', {type: 'text/css'}, dom.head()),
 	cmd_parse_info = {
@@ -48,12 +49,13 @@ var EXPRARG = parser.EXPRARG,
 		return words.length === 1 ? [1, EXPRARG] : [];
 	},
 	'foreach':	function(words){
-		return [words.length-1, SCRIPTARG];
+		return [last_real_word_number(words), SCRIPTARG];
 	},
-	'lmap':		function(words){ return [words.length-1, SCRIPTARG]; },
+	'lmap':		function(words){ return [last_real_word_number(words), SCRIPTARG]; },
 	'for':		[1, SCRIPTARG, 2, EXPRARG, 3, SCRIPTARG, 4, SCRIPTARG],
 	'while':	[1, EXPRARG, 2, SCRIPTARG],
-	'proc':		[3, SCRIPTARG]
+	'proc':		[3, SCRIPTARG],
+	'subst':	function(words){ return [last_real_word_number(words), SUBSTARG]; }
 };
 
 function real_word(word) {
@@ -81,6 +83,16 @@ function real_words(words) {
 		}
 	}
 	return realwords;
+}
+
+function last_real_word_number(words) {
+	var i, found;
+	for (i=0; i<words.length; i++) {
+		if (real_word(words[i])) {
+			found = i;
+		}
+	}
+	return found;
 }
 
 function get_text(word, raw) {
@@ -127,11 +139,28 @@ function replace_static(tokens, token) {
 	return out;
 }
 
+function deep_parse_tokens(tokens) {
+	var i, token;
+	for (i=0; i<tokens.length; i++) {
+		token = tokens[i];
+		if (token[0] == parser.SCRIPT) {
+			token[1] = deep_parse(token)[1];
+		}
+	}
+}
+
 function deep_parse(script_tok) {
 	var commands=script_tok[1], command, i, j, k, parse_info, special, txt, ofs;
 
 	for (i=0; i<commands.length; i++) {
 		command = commands[i];
+
+		// Scan for SCRIPT tokens to recurse into
+		for (j=0; j<command.length; j++) {
+			deep_parse_tokens(command[j]);
+		}
+
+		console.log('processing command: '+get_text(command[0]));
 		parse_info = cmd_parse_info[get_text(command[0])];
 		if (parse_info === undefined) {continue;}
 		special = typeof parse_info === 'function' ?
@@ -163,6 +192,17 @@ function deep_parse(script_tok) {
 						parser.parse_expr(txt, ofs),
 						ofs
 					]);
+					break;
+
+				case SUBSTARG:
+					ofs = word_start(command[k]);
+					command[k] = replace_static(command[k], [
+						SUBSTARG,
+						command[k].slice(),
+						parser.parse_subst(txt,ofs),
+						ofs
+					]);
+					deep_parse_tokens(command[k][2][2]);
 					break;
 			}
 		}
@@ -293,6 +333,17 @@ function display_token(token, parent) {
 			subnode = dom.create('div', {style: {marginLeft: '2em'}}, node);
 			for (i=0; i<token[2].length; i++) {
 				display_expr_token(token[2][i], subnode);
+			}
+			dom.appendText(node, [
+				markup_tok_element(token[3]), ']'
+			]);
+			break;
+
+		case parser.SUBSTARG:
+			node = dom.create('div', {}, parent, '['+tokname(type)+', ');
+			subnode = dom.create('div', {style: {marginLeft: '2em'}}, node);
+			for (i=0; i<token[2].length; i++) {
+				display_token(token[2][i], subnode);
 			}
 			dom.appendText(node, [
 				markup_tok_element(token[3]), ']'

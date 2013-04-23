@@ -33,7 +33,9 @@ var EXPRARG = parser.EXPRARG,
 			switch (wordtext) {
 				case 'then':
 				case 'else':
+					break;
 				case 'elseif':
+					special.push(++p, EXPRARG);
 					break;
 				default:
 					if (wordtext != null) {

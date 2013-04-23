@@ -177,7 +177,7 @@ function deep_parse(script_tok) {
 		cmd_text = get_text(command[0]);
 		if (cmd_text === 'proc') {
 			var ofs = word_start(command[0]);
-			console.log(tcllist.to_tcl([current_fn, get_text(command[1]), line_no(ofs), line_ofs(ofs), command_range(command)]));
+			console.log(tcllist.to_tcl([get_text(command[1]), current_fn, line_no(ofs), line_ofs(ofs), command_range(command)]));
 		}
 		parse_info = cmd_parse_info[cmd_text];
 		if (parse_info === undefined) {continue;}

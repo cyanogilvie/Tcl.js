@@ -128,7 +128,7 @@ proc debug args { #<<<
 							set code [catch {uplevel 1 [lindex $msg 1]} res]
 							はなす answer $code $res
 						}
-						instead	{
+						instead {
 							set script [lindex $msg 1]
 						}
 						set_breakpoint {

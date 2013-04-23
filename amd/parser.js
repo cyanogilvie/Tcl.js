@@ -1,6 +1,11 @@
 /*jshint eqnull:true */
 /*global define */
 
+/* Current parser bugs:
+   if {[regexp "\\\$(\[0-9\.\,]+)" hello match item(price)]} {}
+   set foo "$"
+ */
+
 define(['./types'], function(types){
 "use strict";
 

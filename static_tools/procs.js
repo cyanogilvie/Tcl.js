@@ -266,7 +266,14 @@ function process_files(files) {
 				console.err(err);
 			} else {
 				current_fn = fn;
-				parse_script(data);
+				try {
+					parse_script(data);
+				} catch(e) {
+					if (e instanceof parser.ParseError) {
+						console.error('Parse error: '+e.message+' in "'+fn+'" at line '+line_no(e.char)+' character '+line_ofs(e.char));
+						process.exit(1);
+					}
+				}
 			}
 			return trampoline(next_file);
 		});

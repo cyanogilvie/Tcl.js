@@ -387,8 +387,8 @@ function parse(text, mode, ofs) {
 
 					case '"':
 						if (!ignore_trailing && text[i+1] !== undefined && text.substr(i+1, 2) !== '\\\n' && !(incmdsubst ? /[\s;\]]/ : /[\s;]/).test(text[i+1])) {
-							var lineno = text.substr(0, i).replace(/[^\n]/, '').length;
-							//console.log('line: '+lineno+': '+text.substr(i-5, 10));
+							var lineno = text.substr(0, i).replace(/[^\n]+/, '').length;
+							console.log('i: '+i+', ('+text.substr(0, 100)+') line: '+lineno+': '+text.substr(i-5, 10));
 							throw new ParseError('extra characters after close-quote', i+1);
 						}
 						if (i === start + 1) {
@@ -722,6 +722,7 @@ function parse(text, mode, ofs) {
 				throw new types.TclError('invalid bareword "'+m[0]+'"',
 					['TCL', 'PARSE', 'EXPR', 'BAREWORD']);
 			}
+			console.log('Cannot parse expression portion: "'+here+'"');
 			throw new types.TclError('Cannot parse expression portion: "'+here+'"',
 				['TCL', 'PARSE', 'EXPR', 'GIVEUP']);
 		}

@@ -381,7 +381,7 @@ function parse(text, mode, ofs) {
 						throw new ParseError('missing "', start);
 
 					case '"':
-						if (!ignore_trailing && text[i+1] !== undefined && !(incmdsubst ? /[\s;\]]/ : /[\s;]/).test(text[i+1])) {
+						if (!ignore_trailing && text[i+1] !== undefined && text.substr(i+1, 2) !== '\\\n' && !(incmdsubst ? /[\s;\]]/ : /[\s;]/).test(text[i+1])) {
 							var lineno = text.substr(0, i).replace(/[^\n]/, '').length;
 							//console.log('line: '+lineno+': '+text.substr(i-5, 10));
 							throw new ParseError('extra characters after close-quote', i+1);

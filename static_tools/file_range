@@ -1,0 +1,10 @@
+#!/usr/bin/env cfkit8.6
+# vim: ft=tcl
+
+proc readfile fn {
+	set h	[open $fn r]
+	try {read $h} finally {close $h}
+}
+
+lassign $argv fn from to
+puts -nonewline [string range [readfile $fn] $from $to]

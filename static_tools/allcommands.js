@@ -220,7 +220,7 @@ function deep_parse(script_tok) {
 					command[k] = replace_static(command[k], [
 						SUBSTARG,
 						command[k].slice(),
-						parser.parse_subst(txt,ofs),
+						parser.parse_subst(txt, ofs),
 						ofs
 					]);
 					deep_parse_tokens(command[k][2][2]);
@@ -231,10 +231,25 @@ function deep_parse(script_tok) {
 	return script_tok;
 }
 
-function parse_script(script_str) {
-	var parsed, deep = true;
+function visualize_whitespace(str) {
+	return str.replace(
+		/\n/g, '\u23ce'
+	).replace(
+		/\t/g, '\u21e5'
+	);
+}
 
-	return deep_parse(parser.parse_script(script_str));
+function parse_script(script_str) {
+	var parsed, deep = true, preamble, preamble_len;
+
+	try {
+		return deep_parse(parser.parse_script(script_str));
+	} catch(e){
+		if (e instanceof parser.ParseError) {
+			console.error(e.message);
+			process.exit(1);
+		}
+	}
 }
 
 function line_no(ofs) {

@@ -86,9 +86,30 @@ var iface, e,
 		/^[?:]/,			3
 	];
 
-function ParseError(message, char) {
+function line_no(source, ofs) {
+	var line = source.substr(0, ofs).replace(/[^\n]+/g, '').length;
+	return line+1;
+}
+function line_ofs(source, ofs) {
+	return ofs - source.lastIndexOf('\n', ofs);
+}
+function visualize_whitespace(str) {
+	return str.replace(
+		/\n/g, '\u23ce'
+	).replace(
+		/\t/g, '\u21e5'
+	);
+}
+function ParseError(message, char, source) {
+	var preamble_len;
+	preamble_len = Math.min(char, 20);
 	this.name = 'ParseError';
-	this.message = message;
+	this.error = message;
+	this.line_no = line_no(source, char);
+	this.line_ofs = line_ofs(source, char);
+	this.message = 'Parse error: '+message+' at line '+this.line_no+', character '+this.line_ofs+
+		'\n\t'+visualize_whitespace(source.substr(e.char-preamble_len, preamble_len+20))+
+		'\n\t'+new Array(preamble_len).join('.')+'^';
 	this.char = char;
 }
 ParseError.prototype = new Error();
@@ -295,7 +316,7 @@ function parse(text, mode, ofs) {
 			emit([SYNTAX, text[i++]]);
 			idx = text.indexOf('}', i);
 			if (idx === -1) {
-				throw new ParseError('missing close-brace for variable name', i);
+				throw new ParseError('missing close-brace for variable name', i, text);
 			}
 			token = text.substr(i, idx-i);
 			i += idx-i;
@@ -341,7 +362,7 @@ function parse(text, mode, ofs) {
 
 		while (depth) {
 			m = text.substr(i).match(/(\\*?)?(?:(\{|\})|(\\\n[ \t]*))/);
-			if (m === null) {throw new ParseError('missing close-brace', i-1);}
+			if (m === null) {throw new ParseError('missing close-brace', i-1, text);}
 			if (m[1] !== undefined && m[1].length % 2 === 1) {
 				// The text we found was backquoted, move along
 				i += m.index + m[0].length;
@@ -385,13 +406,13 @@ function parse(text, mode, ofs) {
 			if (quoted) {
 				switch (text[i]) {
 					case undefined:
-						throw new ParseError('missing "', start);
+						throw new ParseError('missing "', start, text);
 
 					case '"':
 						if (!ignore_trailing && text[i+1] !== undefined && text.substr(i+1, 2) !== '\\\n' && !(incmdsubst ? /[\s;\]]/ : /[\s;]/).test(text[i+1])) {
-							var lineno = text.substr(0, i).replace(/[^\n]/, '').length;
-							//console.log('line: '+lineno+': '+text.substr(i-5, 10));
-							throw new ParseError('extra characters after close-quote', i+1);
+							var lineno = text.substr(0, i).replace(/[^\n]+/, '').length;
+							console.log('i: '+i+', ('+text.substr(0, 100)+') line: '+lineno+': '+text.substr(i-5, 10));
+							throw new ParseError('extra characters after close-quote', i+1, text);
 						}
 						if (i === start + 1) {
 							// Need to manually emit rather than using
@@ -528,7 +549,7 @@ function parse(text, mode, ofs) {
 				value = '';
 			}
 			if (value.length === 0 && type !== END) {
-				throw new ParseError('Refusing to emit a token of length 0', i);
+				throw new ParseError('Refusing to emit a token of length 0', i, text);
 			}
 			tokens.push([type, subtype, crep, value]);
 			i += value.length;
@@ -673,7 +694,7 @@ function parse(text, mode, ofs) {
 									}
 							}
 						}
-						throw new ParseError('No variable found', i);
+						throw new ParseError('No variable found', i, text);
 					});
 					continue;
 				case '[':
@@ -687,7 +708,7 @@ function parse(text, mode, ofs) {
 								emit_token(SYNTAX, tokens[j][1]);
 							}
 						}
-						throw new ParseError('No script found', i);
+						throw new ParseError('No script found', i, text);
 					});
 					continue;
 				case '(': emit_token(LPAREN, text[i]);			continue;
@@ -724,6 +745,7 @@ function parse(text, mode, ofs) {
 				throw new types.TclError('invalid bareword "'+m[0]+'"',
 					['TCL', 'PARSE', 'EXPR', 'BAREWORD']);
 			}
+			console.log('Cannot parse expression portion: "'+here+'"');
 			throw new types.TclError('Cannot parse expression portion: "'+here+'"',
 				['TCL', 'PARSE', 'EXPR', 'GIVEUP']);
 		}

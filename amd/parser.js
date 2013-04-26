@@ -36,6 +36,7 @@ var iface, e,
 	SCRIPTARG	= 24,
 	EXPRARG		= 25,
 	SUBSTARG	= 26,
+	SWITCHARG	= 27,
 	t = {
 		TEXT	: TEXT,
 		SPACE	: SPACE,
@@ -64,7 +65,8 @@ var iface, e,
 
 		SCRIPTARG	: SCRIPTARG,
 		EXPRARG		: EXPRARG,
-		SUBSTARG	: SUBSTARG
+		SUBSTARG	: SUBSTARG,
+		SWITCHARG	: SWITCHARG
 	}, operators = [
 		/^(?:~|!(?=[^=]))/,	1,
 		/^\*\*/,			2,

@@ -20,6 +20,7 @@ require([
 var EXPRARG = parser.EXPRARG,
 	SCRIPTARG = parser.SCRIPTARG,
 	SUBSTARG = parser.SUBSTARG,
+	SWITCHARG = parser.SWITCHARG,
 	marked_up_parent,
 	dynStyleNode = dom.create('style', {type: 'text/css'}, dom.head()),
 	cmd_parse_info = {
@@ -57,7 +58,40 @@ var EXPRARG = parser.EXPRARG,
 	'for':		[1, SCRIPTARG, 2, EXPRARG, 3, SCRIPTARG, 4, SCRIPTARG],
 	'while':	[1, EXPRARG, 2, SCRIPTARG],
 	'proc':		[3, SCRIPTARG],
-	'subst':	function(words){ return [last_real_word_number(words), SUBSTARG]; }
+	'subst':	function(words){ return [last_real_word_number(words), SUBSTARG]; },
+	'switch':	function(words){
+		var i=0, specials=[];
+
+		while (i<words.length) {
+			switch (get_text(words[i])) {
+				case '-exact':
+				case '-glob':
+				case '-regexp':
+				case '-nocase':
+					i++;
+					break;
+
+				case '-matchvar':
+				case '-indexvar':
+					i+=2;
+					break;
+
+				case '--':
+				default:
+					break;
+			}
+		}
+
+		i++;	// String argument
+		if (words.length - i === 1) {
+			specials.push([i, SWITCHARG]);
+		} else {
+			while (i<words.length) {
+				specials.push([i+1, SCRIPTARG]);
+				i+=2;
+			}
+		}
+	}
 };
 
 function real_word(word) {
@@ -205,6 +239,10 @@ function deep_parse(script_tok) {
 						ofs
 					]);
 					deep_parse_tokens(command[k][2][2]);
+					break;
+
+				case SWITCHARG:
+					// TODO: something
 					break;
 			}
 		}

@@ -64,7 +64,6 @@ proc ofs2line {filedata ofs} { #<<<
 #>>>
 proc scan_range {fn from to re {cx ""}} { #<<<
 	global scanned here
-	#puts "scan_range [list $fn $from $to $re]"
 	set filedata	[readfile $fn]
 	set script		[string range $filedata $from $to]
 	set cx_shown	0
@@ -105,8 +104,16 @@ proc scan_range {fn from to re {cx ""}} { #<<<
 }
 
 #>>>
-proc main {fn fromline toline re} { #<<<
-	lassign [linerange2ofs $fn $fromline $toline] from_ofs to_ofs
+proc main {fn re {fromline ""} {toline ""}} { #<<<
+	if {$fromline eq "" && $toline eq ""} {
+		set from_ofs	0
+		set to_ofs		[- [file size $fn] 1]
+	} elseif {$toline eq ""} {
+		set toline	$fromline
+		lassign [linerange2ofs $fn $fromline $toline] from_ofs to_ofs
+	} else {
+		lassign [linerange2ofs $fn $fromline $toline] from_ofs to_ofs
+	}
 
 	scan_range $fn $from_ofs $to_ofs $re
 }

@@ -197,11 +197,54 @@ function command_range(command) {
 	return [from, to-1];
 }
 
+function word_braced(word) {
+	var token, i;
+	for (i=0; i<word.length; i++) {
+		token = word[i];
+		if (token[0] === parser.SPACE || token[0] === parser.COMMENT) {continue;}
+		if (token[0] === parser.SYNTAX && token[1] === '{') {
+			return true;
+		}
+		return false;
+	}
+	return false;
+}
+
+function is_unbraced(cmd_text, command) {
+	var i, token;
+	switch (cmd_text) {
+		case 'while':
+		case 'expr':
+			return !word_braced(command[1]);
+
+		case 'if':
+			if (!word_braced(command[1])) {
+				return true;
+			}
+			for (i=2; i<command.length; i++) {
+				if (get_text(command[i]) === 'elseif') {
+					i++;
+					if (!word_braced(command[i])) {
+						return true;
+					}
+				}
+			}
+			return false;
+
+		case 'for':
+			return !word_braced(command[2]);
+
+		default:
+			return false;
+	}
+}
+
 function show_command(range) {
 	return source.substr(range[0], range[1]-range[0]+1);
 }
 
 // Populate with built-in commands, to suppress output for those
+var hits = [];
 function deep_parse(script_tok) {
 	var commands=script_tok[1], command, i, j, k, parse_info, special, txt, ofs,
 		cmd_text;
@@ -215,11 +258,11 @@ function deep_parse(script_tok) {
 		}
 
 		cmd_text = get_text(command[0]);
-		if (cmd_text === 'proc') {
-			var ofs = word_start(command[0]);
-			console.log(tcllist.to_tcl([get_text(command[1]), current_fn, line_no(ofs), line_ofs(ofs), command_range(command)]));
-		}
 		parse_info = cmd_parse_info[cmd_text];
+		if (is_unbraced(cmd_text, command)) {
+			ofs = word_start(command[0]);
+			hits.push([current_fn, line_no(ofs), line_ofs(ofs), command_range(command), show_command(command_range(command))]);
+		}
 		if (parse_info === undefined) {continue;}
 		special = typeof parse_info === 'function' ?
 			parse_info(command) : parse_info;
@@ -312,7 +355,10 @@ function process_files(files) {
 	var fs = require('fs'), i=0, f;
 	function next_file() {
 		var fn = files[i++];
-		if (fn === undefined) {return;}
+		if (fn === undefined) {
+			console.log(tcllist.to_tcl(hits));
+			return;
+		}
 
 		fs.readFile(fn, 'utf8', function(err, data){
 			var m, flags = {
@@ -325,7 +371,7 @@ function process_files(files) {
 				console.warn('Ignoring file "'+fn+'"');
 				return trampoline(next_file);
 			}
-			//console.warn('Examining "'+fn+'"');
+			console.warn('Examining "'+fn+'"');
 			if (err) {
 				console.err(err);
 			} else {
@@ -335,10 +381,10 @@ function process_files(files) {
 				} catch(e) {
 					if (e instanceof parser.ParseError) {
 						//console.error('Parse error: '+e.error+' in "'+fn+'" at line '+line_no(e.char+e.ofs)+' character '+line_ofs(e.char+e.ofs));
-						console.error('Parse error in "'+fn+'":\n'+e.pretty_print(data));
+						console.error(e.pretty_print(data));
 						process.exit(1);
 					} else {
-						console.error('Parse error in "'+fn+'": '+e.message+':\n'+e.stack);
+						console.error('Parse error: '+e.message+':\n'+e.stack);
 						process.exit(1);
 					}
 				}

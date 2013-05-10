@@ -2,6 +2,7 @@
 /*global require */
 require([
 	'tcl/parser',
+	'tcl/parser_utils',
 	'tcl/list',
 	'./dom',
 	'm2/m2',
@@ -13,62 +14,25 @@ require([
 	'dojo/domReady!'
 ], function(
 	parser,
+	parser_utils,
 	tcllist,
 	dom,
-	m2,
+	M2,
 	log,
 	on,
 	domClass
 ){
 'use strict';
 
-var EXPRARG = parser.EXPRARG,
-	SCRIPTARG = parser.SCRIPTARG,
-	marked_up_parent,
-	m2 = new m2({host: 'localhost'}),
+var marked_up_parent,
+	m2 = new M2({host: 'localhost'}),
 	debugger_jmid,
 	scripts = {},
 	current_script = null,
 	stepping = true,
 	breakpoints = {},
 	depth_trigger = null,
-	dynStyleNode = dom.create('style', {type: 'text/css'}, dom.head()),
-	cmd_parse_info = {
-	'if': function(words){
-		var special = [
-			1, EXPRARG
-		], wordtext, p;
-
-		for (p=2; p<words.length; p++) {
-			wordtext = get_text(words[p]);
-			switch (wordtext) {
-				case 'then':
-				case 'else':
-					break;
-				case 'elseif':
-					special.push(++p, EXPRARG);
-					break;
-				default:
-					if (wordtext != null) {
-						special.push(p, SCRIPTARG);
-					}
-			}
-		}
-
-		return special;
-	},
-
-	'expr':		function(words){
-		return words.length === 1 ? [1, EXPRARG] : [];
-	},
-	'foreach':	function(words){
-		return [words.length-1, SCRIPTARG];
-	},
-	'lmap':		function(words){ return [words.length-1, SCRIPTARG]; },
-	'for':		[1, SCRIPTARG, 2, EXPRARG, 3, SCRIPTARG, 4, SCRIPTARG],
-	'while':	[1, EXPRARG, 2, SCRIPTARG],
-	'proc':		[3, SCRIPTARG]
-};
+	dynStyleNode = dom.create('style', {type: 'text/css'}, dom.head());
 
 m2.signals.connected.attach_output(function(newstate){
 	console.log('m2 connected: '+newstate);
@@ -101,7 +65,7 @@ function show_location(scrid, start, end) {
 	if (current_script !== scrid) {
 		load_script(scrid);
 	}
-	if (!stepping) return;
+	if (!stepping) {return;}
 
 	console.log('show_location: '+scrid+','+start+','+end);
 	dynStyleNode.innerHTML = '#cmd_'+start+'-'+end+' {outline: 1px dashed red; background: #400;}';
@@ -186,7 +150,7 @@ function send() {
 		errprefix = args.pop(), list = tcllist.array2list(args);
 	log.notice('Sending "'+list+'"');
 	m2.rsj_req(debugger_jmid[0], list, function(msg){
-		if (msg.type == 'nack') {
+		if (msg.type === 'nack') {
 			alert(errprefix+': '+msg.data);
 		}
 	});
@@ -289,128 +253,11 @@ m2.svc_signal('debugger').attach_output(function(newstate){
 	}
 });
 
-function real_word(word) {
-	var i, type;
-	for (i=0; i<word.length; i++) {
-		type = word[i][0];
-		if (
-			type === parser.SPACE ||
-			type === parser.COMMENT ||
-			type === parser.END
-		) {
-			continue;
-		}
-		return true;
-	}
-	return false;
-}
-
-function real_words(words) {
-	var i, realwords = [];
-
-	for (i=0; i<words.length; i++) {
-		if (real_word(words[i])) {
-			realwords.push(words[i]);
-		}
-	}
-	return realwords;
-}
-
-function get_text(word, raw) {
-	var i, text=[];
-	for (i=0; i<word.length; i++) {
-		switch (word[i][0]) {
-			case parser.TEXT:		text.push(word[i][1]); break;
-			case parser.ESCAPE:		text.push(word[i][raw?1:2]); break;
-			case parser.SPACE:		break;
-			case parser.END:		break;
-			case parser.SYNTAX:		break;
-			case parser.COMMENT:	break;
-			default:				return null;
-		}
-	}
-	return text.length ? text.join('') : null;
-}
-
-function word_start(word) {
-	var i;
-	for (i=0; i<word.length; i++) {
-		if (word[i][0] === parser.TEXT || word[i][0] === parser.ESCAPE) {
-			return word[i][3];
-		}
-	}
-}
-
-function replace_static(tokens, token) {
-	var i=0, replaced=false, out=[];
-
-	for (i=0; i<tokens.length; i++) {
-		if (tokens[i][0] === parser.TEXT || tokens[i][0] === parser.ESCAPE) {
-			if (!replaced) {
-				out.push(token);
-				replaced = true;
-			}
-		} else {
-			out.push(tokens[i]);
-		}
-	}
-	if (!replaced) {
-		throw new Error('Couldn\'t find static tokens to replace');
-	}
-	return out;
-}
-
-function deep_parse(script_tok) {
-	var commands=script_tok[1], command, i, j, k, parse_info, special, txt, ofs;
-
-	for (i=0; i<commands.length; i++) {
-		command = commands[i];
-		parse_info = cmd_parse_info[get_text(command[0])];
-		if (parse_info === undefined) {continue;}
-		special = typeof parse_info === 'function' ?
-			parse_info(command) : parse_info;
-		for (j=0; j<special.length; j+=2) {
-			k = special[j];
-			txt = get_text(command[k], true);
-			if (txt == null) {
-				// word text is dynamic - comes from a variable or
-				// result of a command, so we can't statically parse it
-				break;
-			}
-			switch (special[j+1]) {
-				case SCRIPTARG:
-					ofs = word_start(command[k]);
-					command[k] = replace_static(command[k], [
-						SCRIPTARG,
-						command[k].slice(),
-						deep_parse(parser.parse_script(txt, ofs)),
-						ofs
-					]);
-					break;
-
-				case EXPRARG:
-					ofs = word_start(command[k]);
-					command[k] = replace_static(command[k], [
-						EXPRARG,
-						command[k].slice(),
-						parser.parse_expr(txt, ofs),
-						ofs
-					]);
-					break;
-			}
-		}
-	}
-	return script_tok;
-}
-
 function parse_script(script_str, scrid) {
-	var parsed, deep = true
+	var parsed;
 
 	try {
-		parsed =
-			deep ?
-				deep_parse(parser.parse_script(script_str)) :
-				parser.parse_script(script_str);
+		parsed = parser_utils.deep_parse(parser.parse_script(script_str));
 	} catch(e) {
 		if (e instanceof parser.ParseError) {
 			var script_frag = script_str.substr(e.char), msg, line, ofs, linestart;
@@ -455,7 +302,7 @@ function reconstitute_word(word) {
 				break;
 			case parser.INDEX:
 				script += reconstitute_word(token[1]);
-				break
+				break;
 			default:
 				script += token[1];
 		}
@@ -464,7 +311,7 @@ function reconstitute_word(word) {
 }
 
 function reconstitute(commands) {
-	var i, j, k, script='', command, word, token;
+	var i, j, script='', command, word;
 
 	for (i=0; i<commands.length; i++) {
 		command = commands[i];
@@ -478,7 +325,7 @@ function reconstitute(commands) {
 }
 
 function instrument(commands, scrid) {
-	var i,j,k,l,m, script='', command, newcommand, word, token, outcommands=[], endtok, cmdofs, cmdendofs;
+	var i,j,k,l,m, command, newcommand, word, token, outcommands=[], endtok, cmdofs, cmdendofs;
 
 	for (i=0; i<commands.length; i++) {
 		command = commands[i];
@@ -499,7 +346,7 @@ function instrument(commands, scrid) {
 						break;
 					case parser.EXPRARG:
 						for (l=0; l<token[2].length; l++) {
-							if (token[2][l][0] !== parser.OPERAND) continue;
+							if (token[2][l][0] !== parser.OPERAND) {continue;}
 							switch (token[2][l][1]) {
 								case parser.SCRIPT:
 									token[2][l][2][1] = instrument(token[2][l][2][1], scrid);
@@ -527,7 +374,7 @@ function instrument(commands, scrid) {
 				}
 			}
 		}
-		if (real_words(command).length === 0) {
+		if (parser_utils.real_words(command).length === 0) {
 			outcommands.push(command);
 		} else {
 			newcommand = [
@@ -585,20 +432,20 @@ function markup_tok_element(any) {
 }
 
 function display_token(token, scrid) {
-	var i, j, k, type = token[0], node, subnode, commands, command, word,
-		cNode, wNode, tNode, attribs = {}, from, to, commandspan, newnode, tmp;
+	var i, j, k, type = token[0], commands, command, word,
+		attribs = {}, from, to, commandspan, newnode, tmp;
 
 	switch (type) {
 		case parser.SCRIPTARG:
 		case parser.SCRIPT:
-			if (type === SCRIPTARG) {
+			if (type === parser.SCRIPTARG) {
 				token = token[2];
 			}
 			commands = token[1];
 			for (i=0; i<commands.length; i++) {
 				command = commands[i];
 				from = null;
-				if (real_words(command).length > 0) {
+				if (parser_utils.real_words(command).length > 0) {
 					commandspan = push_marked_up_parent({className: 'command'});
 				} else {
 					commandspan = push_marked_up_parent({});
@@ -636,7 +483,7 @@ function display_token(token, scrid) {
 						marked_up_parent.pop();
 					}
 				}
-				if (real_words(command).length > 0) {
+				if (parser_utils.real_words(command).length > 0) {
 					marked_up_parent.pop();
 					commandspan.setAttribute('id', 'cmd_'+from+'-'+to);
 					commandspan.setAttribute('data-scrid', scrid);

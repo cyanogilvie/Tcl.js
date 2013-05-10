@@ -880,7 +880,9 @@ iface = {
 	'parse_subst': parse_subst,
 	'expr2stack': expr2stack,
 	'ParseError': ParseError,
-	'tokenname': {}
+	'tokenname': {},
+	'find_line_no': find_line_no,
+	'find_line_ofs': find_line_ofs
 };
 for (e in t) {
 	if (t.hasOwnProperty(e)) {

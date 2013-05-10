@@ -3,7 +3,6 @@
 
 /* Current parser bugs:
    if {[regexp "\\\$(\[0-9\.\,]+)" hello match item(price)]} {}
-   set foo "$"
  */
 
 define(['./types'], function(types){
@@ -84,11 +83,11 @@ var iface, e,
 		/^[?:]/,			3
 	];
 
-function line_no(source, ofs) {
+function find_line_no(source, ofs) {
 	var line = source.substr(0, ofs).replace(/[^\n]+/g, '').length;
 	return line+1;
 }
-function line_ofs(source, ofs) {
+function find_line_ofs(source, ofs) {
 	return ofs - source.lastIndexOf('\n', ofs);
 }
 function visualize_whitespace(str) {
@@ -98,17 +97,21 @@ function visualize_whitespace(str) {
 		/\t/g, '\u21e5'
 	);
 }
-function ParseError(message, char, source) {
-	var preamble_len;
-	preamble_len = Math.min(char, 20);
+function ParseError(message, charnum, source, ofs) {
 	this.name = 'ParseError';
-	this.error = message;
-	this.line_no = line_no(source, char);
-	this.line_ofs = line_ofs(source, char);
-	this.message = 'Parse error: '+message+' at line '+this.line_no+', character '+this.line_ofs+
-		'\n\t'+visualize_whitespace(source.substr(e.char-preamble_len, preamble_len+20))+
-		'\n\t'+new Array(preamble_len).join('.')+'^';
-	this.char = char;
+	this.message = message;
+	this.line_no = find_line_no(source, charnum);
+	this.line_ofs = find_line_ofs(source, charnum);
+	this.pretty_print = function(fullsource){
+		var preamble_len = Math.min(charnum, 20),
+			line_no = find_line_no(fullsource, charnum+ofs),
+			line_ofs = find_line_ofs(fullsource, charnum+ofs);
+		return 'Parse error: '+message+' at line '+line_no+', character '+line_ofs+
+			'\n\t'+visualize_whitespace(fullsource.substr(charnum+ofs-preamble_len, preamble_len+20))+
+			'\n\t'+new Array(preamble_len+1).join('.')+'^';
+	};
+	this.char = charnum;
+	this.ofs = ofs || 0;
 }
 ParseError.prototype = new Error();
 
@@ -261,6 +264,9 @@ function parse(text, mode, ofs) {
 			tokens = savetokens;
 			command.push(word);
 			lasttoken = word[word.length-1];
+			if (lasttoken == null) {
+				throw new ParseError('Cannot find end of command', i, text, ofs);
+			}
 			if (lasttoken[0] === END) {
 				commands.push(command);
 				command = [];
@@ -276,10 +282,11 @@ function parse(text, mode, ofs) {
 	function parse_variable() {
 		var idx, save_i;
 
-		if (text[i+1] === '$') {
+		if (!/^([a-zA-Z0-9_{]|::)/.test(text.substr(i+1,2))) {
 			token += text[i++];
 			return;
 		}
+
 		emit_waiting(TEXT);
 		emit([SYNTAX, text[i++]]);
 
@@ -314,7 +321,7 @@ function parse(text, mode, ofs) {
 			emit([SYNTAX, text[i++]]);
 			idx = text.indexOf('}', i);
 			if (idx === -1) {
-				throw new ParseError('missing close-brace for variable name', i, text);
+				throw new ParseError('missing close-brace for variable name', i, text, ofs);
 			}
 			token = text.substr(i, idx-i);
 			i += idx-i;
@@ -333,7 +340,7 @@ function parse(text, mode, ofs) {
 		} else {
 			token = text.substr(i).match(/[a-zA-Z_0-9:]+/)[0];
 			// : alone is a name terminator
-			idx = token.replace(/::/, '__').indexOf(':');
+			idx = token.replace(/::/g, '__').indexOf(':');
 			if (idx > 0) {
 				token = token.substr(0, idx);
 			}
@@ -360,7 +367,7 @@ function parse(text, mode, ofs) {
 
 		while (depth) {
 			m = text.substr(i).match(/(\\*?)?(?:(\{|\})|(\\\n[ \t]*))/);
-			if (m === null) {throw new ParseError('missing close-brace', i-1, text);}
+			if (m === null) {throw new ParseError('missing close-brace', i-1, text, ofs);}
 			if (m[1] !== undefined && m[1].length % 2 === 1) {
 				// The text we found was backquoted, move along
 				i += m.index + m[0].length;
@@ -404,13 +411,13 @@ function parse(text, mode, ofs) {
 			if (quoted) {
 				switch (text[i]) {
 					case undefined:
-						throw new ParseError('missing "', start, text);
+						throw new ParseError('missing "', start, text, ofs);
 
 					case '"':
 						if (!ignore_trailing && text[i+1] !== undefined && text.substr(i+1, 2) !== '\\\n' && !(incmdsubst ? /[\s;\]]/ : /[\s;]/).test(text[i+1])) {
 							var lineno = text.substr(0, i).replace(/[^\n]+/, '').length;
 							console.log('i: '+i+', ('+text.substr(0, 100)+') line: '+lineno+': '+text.substr(i-5, 10));
-							throw new ParseError('extra characters after close-quote', i+1, text);
+							throw new ParseError('extra characters after close-quote', i+1, text, ofs);
 						}
 						if (i === start + 1) {
 							// Need to manually emit rather than using
@@ -547,9 +554,10 @@ function parse(text, mode, ofs) {
 				value = '';
 			}
 			if (value.length === 0 && type !== END) {
-				throw new ParseError('Refusing to emit a token of length 0', i, text);
+				throw new ParseError('Refusing to emit a token of length 0', i, text, ofs);
 			}
 			tokens.push([type, subtype, crep, value]);
+			tokstart += value.length;
 			i += value.length;
 		}
 
@@ -692,7 +700,7 @@ function parse(text, mode, ofs) {
 									}
 							}
 						}
-						throw new ParseError('No variable found', i, text);
+						throw new ParseError('No variable found', i, text, ofs);
 					});
 					continue;
 				case '[':
@@ -706,7 +714,7 @@ function parse(text, mode, ofs) {
 								emit_token(SYNTAX, tokens[j][1]);
 							}
 						}
-						throw new ParseError('No script found', i, text);
+						throw new ParseError('No script found', i, text, ofs);
 					});
 					continue;
 				case '(': emit_token(LPAREN, text[i]);			continue;

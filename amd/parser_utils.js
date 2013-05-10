@@ -48,7 +48,7 @@ var iface,
 	'subst':	function(words){ return [last_real_word_number(words), SUBSTARG]; },
 	'time':		[1, SCRIPTARG],
 	'switch':	function(words){
-		var i=0, specials=[], skipping_args=true;
+		var i=1, specials=[], skipping_args=true;
 
 		while (skipping_args && i<words.length) {
 			switch (get_text(words[i])) {

@@ -74,10 +74,10 @@ var iface,
 
 		i++;	// String argument
 		if (words.length - i === 1) {
-			specials.push([i, SWITCHARG]);
+			specials.push(i, SWITCHARG);
 		} else {
 			while (i<words.length) {
-				specials.push([i+1, SCRIPTARG]);
+				specials.push(i+1, SCRIPTARG);
 				i+=2;
 			}
 		}

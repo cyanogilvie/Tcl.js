@@ -20,15 +20,19 @@ requirejs([
 ){
 'use strict';
 
+var hits = [];
+
 parser_utils.for_each_file(process.argv.slice(2), function(fn, err, source){
 	var m, flags = {
 		ignore: false
 	};
-	//console.warn('Examining "'+fn+'"');
+
+	console.warn('Examining "'+fn+'"');
 	if (err) {
-		console.err(err);
+		console.error(err);
 		return;
 	}
+
 	if ((m = /#static:(.*?)\n/.exec(source))) {
 		parser_utils.process_flags(m[1], flags);
 	}
@@ -38,21 +42,30 @@ parser_utils.for_each_file(process.argv.slice(2), function(fn, err, source){
 	}
 	try {
 		return parser_utils.deep_parse(parser.parse_script(source), {
-			oncommand: function(cmd_text, command) {
-				if (cmd_text === 'proc') {
-					var ofs = parser_utils.word_start(command[0]);
-					console.log(tcllist.to_tcl([parser_utils.get_text(command[1]), fn, parser.find_line_no(source, ofs), parser.find_line_ofs(source, ofs), parser_utils.command_range(command)]));
+			oncommand: function(cmd_text, command){
+				var range = parser_utils.command_range(command), ofs;
+				if (parser_utils.is_unbraced(cmd_text, command)) {
+					ofs = parser_utils.word_start(command[0]);
+					hits.push([
+						fn,
+						parser.find_line_no(source, ofs),
+						parser.find_line_ofs(source, ofs),
+						range,
+						source.substr(range[0], range[1]-range[0]+1)
+					]);
 				}
 			}
 		});
 	} catch(e) {
 		if (e instanceof parser.ParseError) {
-			console.error('Parse error in "'+fn+'":\n'+e.pretty_print(source));
+			console.error(e.pretty_print(source));
 			process.exit(1);
 		} else {
-			console.error('Parse error in "'+fn+'": '+e.message+':\n'+e.stack);
+			console.error('Parse error: '+e.message+':\n'+e.stack);
 			process.exit(1);
 		}
 	}
+}, function(){
+	console.log(tcllist.to_tcl(hits));
 });
 });

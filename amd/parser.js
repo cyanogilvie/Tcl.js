@@ -2,7 +2,7 @@
 /*global define */
 
 /* Current parser bugs:
-   if {[regexp "\\\$(\[0-9\.\,]+)" hello match item(price)]} {}
+   None known
  */
 
 define(['./types'], function(types){
@@ -537,7 +537,7 @@ function parse(text, mode, ofs) {
 		switch (text[i]) {
 			case undefined:	return tokens;
 			case '{':		return parse_braced();
-			case '"':		return parse_combined(true, incmdsubst);
+			case '"':		return parse_combined(true, false);
 			case ']':
 				if (incmdsubst) {
 					emit([END, text[i++]]);
@@ -759,6 +759,24 @@ function parse(text, mode, ofs) {
 		}
 	}
 
+	function tokenize_list() {
+		var m;
+
+		while (true) {
+			if ((m = /^\s+/.exec(text.substr(i)))) {
+				emit([SPACE, m[0]]);
+				i += m[0].length;
+			}
+
+			switch (text[i]) {
+				case undefined:	return tokens;
+				case '{':		parse_braced();					break;
+				case '"':		parse_combined(true, false);	break;
+				default:		parse_combined(false, false);	break;
+			}
+		}
+	}
+
 	switch (mode) {
 		case 'script':
 			while (i<text.length) {
@@ -782,6 +800,9 @@ function parse(text, mode, ofs) {
 			return [SCRIPT, commands, undefined, 0];
 		case 'expr':
 			parse_subexpr();
+			return tokens;
+		case 'list':
+			tokenize_list();
 			return tokens;
 		case 'subst':
 			while (i < text.length) {
@@ -818,6 +839,10 @@ function parse_script(text, ofs) {
 
 function parse_expr(text, ofs) {
 	return parse(text, 'expr', ofs);
+}
+
+function parse_list(text, ofs) {
+	return parse(text, 'list', ofs);
 }
 
 function parse_subst(text, ofs) {
@@ -879,6 +904,7 @@ function expr2stack(expr) {
 iface = {
 	'parse_script': parse_script,
 	'parse_expr': parse_expr,
+	'parse_list': parse_list,
 	'parse_subst': parse_subst,
 	'expr2stack': expr2stack,
 	'ParseError': ParseError,

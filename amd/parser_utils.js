@@ -279,9 +279,49 @@ function is_unbraced(cmd_text, command) {
 	}
 }
 
+function list_elements(listtokens) {
+	var i, tok, out=[], ofs, token;
+
+	function emit_elem() {
+		if (tok != null) {
+			out.push([tok, ofs]);
+			tok = null;
+			ofs = null;
+		}
+	}
+
+	for (i=0; i<listtokens.length; i++) {
+		token = listtokens[i];
+		switch (token[0]) {
+			case parser.SPACE:
+				emit_elem();
+				break;
+
+			case parser.TEXT:
+			case parser.ESCAPE:
+				if (ofs == null) {ofs = token[3];}
+				if (tok == null) {tok = '';}
+				tok += token[2] || token[1];
+				break;
+
+			case parser.SYNTAX:
+				break;
+
+			case parser.END:
+				emit_elem();
+				break;
+
+			default:
+				throw new Error('Unexpected list token: '+JSON.stringify(listtokens[i]));
+		}
+	}
+
+	return out;
+}
+
 function deep_parse(script_tok, params) {
 	var commands=script_tok[1], command, i, j, k, parse_info, special, txt, ofs,
-		cmd_text;
+		cmd_text, elems, ei;
 
 	if (params === undefined) {
 		params = {};
@@ -345,7 +385,11 @@ function deep_parse(script_tok, params) {
 					break;
 
 				case SWITCHARG:
-					// TODO: something
+					ofs = word_start(command[k]);
+					elems = list_elements(parser.parse_list(get_text(command[k]), ofs));
+					for (ei=1; ei<elems.length; ei+=2) {
+						deep_parse(parser.parse_script(elems[ei][0], elems[ei][1]), params);
+					}
 					break;
 			}
 		}

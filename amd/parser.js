@@ -478,7 +478,7 @@ function parse(text, mode, ofs) {
 						break;
 
 					case ']':
-						if (incmdsubst) {
+						if (incmdsubst && !quoted) {
 							emit_waiting(TEXT);
 							token = text[i++];
 							emit([END, token]);
@@ -537,7 +537,7 @@ function parse(text, mode, ofs) {
 		switch (text[i]) {
 			case undefined:	return tokens;
 			case '{':		return parse_braced();
-			case '"':		return parse_combined(true, false);
+			case '"':		return parse_combined(true, incmdsubst);
 			case ']':
 				if (incmdsubst) {
 					emit([END, text[i++]]);

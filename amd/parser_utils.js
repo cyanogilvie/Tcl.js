@@ -326,9 +326,9 @@ function deep_parse(script_tok, params) {
 	if (params === undefined) {
 		params = {};
 	}
-	if (params.oncommand === undefined) {
-		params.oncommand = function(){};
-	}
+	if (params.oncommand === undefined) { params.oncommand = function(){}; }
+	if (params.descend === undefined) { params.descend = function(){}; }
+	if (params.ascend === undefined) { params.ascend = function(){}; }
 
 	for (i=0; i<commands.length; i++) {
 		command = commands[i];
@@ -355,22 +355,26 @@ function deep_parse(script_tok, params) {
 			switch (special[j+1]) {
 				case SCRIPTARG:
 					ofs = word_start(command[k]);
+					params.descend(command, k, SCRIPTARG);
 					command[k] = replace_static(command[k], [
 						SCRIPTARG,
 						command[k].slice(),
 						deep_parse(parser.parse_script(txt, ofs), params),
 						ofs
 					]);
+					params.ascend(command, k, SCRIPTARG);
 					break;
 
 				case EXPRARG:
 					ofs = word_start(command[k]);
+					params.descend(command, k, EXPRARG);
 					command[k] = replace_static(command[k], [
 						EXPRARG,
 						command[k].slice(),
 						deep_parse_expr_tokens(parser.parse_expr(txt, ofs), params),
 						ofs
 					]);
+					params.ascend(command, k, EXPRARG);
 					break;
 
 				case SUBSTARG:
@@ -386,10 +390,12 @@ function deep_parse(script_tok, params) {
 
 				case SWITCHARG:
 					ofs = word_start(command[k]);
+					params.descend(command, k, SWITCHARG);
 					elems = list_elements(parser.parse_list(get_text(command[k]), ofs));
 					for (ei=1; ei<elems.length; ei+=2) {
 						deep_parse(parser.parse_script(elems[ei][0], elems[ei][1]), params);
 					}
+					params.ascend(command, k, SWITCHARG);
 					break;
 			}
 		}
@@ -451,6 +457,56 @@ function visualize_space(str) {
 	);
 }
 
+function reconstitute_expr(tokens) {
+	var i, txt='';
+	for (i=0; i<tokens.length; i++) {
+		txt += tokens[i][3];
+	}
+	return txt;
+}
+
+function reconstitute_word(word) {
+	var script='', k, token;
+	for (k=0; k<word.length; k++) {
+		token = word[k];
+		switch (token[0]) {
+			case parser.SCRIPT:
+				script += reconstitute(token[1]);
+				break;
+			case parser.SCRIPTARG:
+				script += reconstitute(token[2][1]);
+				break;
+			case parser.EXPRARG:
+				script += reconstitute_expr(token[2]);
+				break;
+			case parser.INDEX:
+				script += reconstitute_word(token[1]);
+				break;
+			case parser.SUBSTARG:
+				script += reconstitute_word(token[2]);
+				break;
+			case parser.SWITCHARG:
+			default:
+				script += token[1];
+		}
+	}
+	return script;
+}
+
+function reconstitute(commands) {
+	var i, j, script='', command, word;
+
+	for (i=0; i<commands.length; i++) {
+		command = commands[i];
+		for (j=0; j<command.length; j++) {
+			word = command[j];
+			script += reconstitute_word(word);
+		}
+	}
+
+	return script;
+}
+
 iface = {
 	'deep_parse': deep_parse,
 	'word_braced': word_braced,
@@ -463,7 +519,11 @@ iface = {
 	'get_text': get_text,
 	'tokname': tokname,
 	'visualize_space': visualize_space,
-	'real_words': real_words
+	'real_words': real_words,
+	'toklength': toklength,
+	'reconstitute_expr': reconstitute_expr,
+	'reconstitute_word': reconstitute_word,
+	'reconstitute': reconstitute
 };
 
 return iface;

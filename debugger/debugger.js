@@ -278,52 +278,6 @@ function parse_script(script_str, scrid) {
 	}
 }
 
-function reconstitute_expr(tokens) {
-	var i, txt='';
-	for (i=0; i<tokens.length; i++) {
-		txt += tokens[i][3];
-	}
-	return txt;
-}
-
-function reconstitute_word(word) {
-	var script='', k, token;
-	for (k=0; k<word.length; k++) {
-		token = word[k];
-		switch (token[0]) {
-			case parser.SCRIPT:
-				script += reconstitute(token[1]);
-				break;
-			case parser.SCRIPTARG:
-				script += reconstitute(token[2][1]);
-				break;
-			case parser.EXPRARG:
-				script += reconstitute_expr(token[2]);
-				break;
-			case parser.INDEX:
-				script += reconstitute_word(token[1]);
-				break;
-			default:
-				script += token[1];
-		}
-	}
-	return script;
-}
-
-function reconstitute(commands) {
-	var i, j, script='', command, word;
-
-	for (i=0; i<commands.length; i++) {
-		command = commands[i];
-		for (j=0; j<command.length; j++) {
-			word = command[j];
-			script += reconstitute_word(word);
-		}
-	}
-
-	return script;
-}
-
 function instrument(commands, scrid) {
 	var i,j,k,l,m, command, newcommand, word, token, outcommands=[], endtok, cmdofs, cmdendofs;
 
@@ -350,7 +304,7 @@ function instrument(commands, scrid) {
 							switch (token[2][l][1]) {
 								case parser.SCRIPT:
 									token[2][l][2][1] = instrument(token[2][l][2][1], scrid);
-									token[2][l][3] = reconstitute(token[2][l][2][1], scrid);
+									token[2][l][3] = parser_utils.reconstitute(token[2][l][2][1], scrid);
 									break;
 								case parser.QUOTED:
 									for (m=0; m<token[2][l][2].length; m++) {
@@ -382,7 +336,7 @@ function instrument(commands, scrid) {
 				[[parser.SPACE, ' '], [parser.TXT, cmdofs]],
 				[[parser.SPACE, ' '], [parser.TXT, cmdendofs]],
 				[[parser.SPACE, ' '], [parser.TXT, scrid]],
-				[[parser.SPACE, ' '], [parser.TXT, tcllist.array2list([reconstitute([command])])], endtok],
+				[[parser.SPACE, ' '], [parser.TXT, tcllist.array2list([parser_utils.reconstitute([command])])], endtok],
 			];
 			outcommands.push(newcommand);
 		}
@@ -392,7 +346,7 @@ function instrument(commands, scrid) {
 }
 
 function instrument_script(source, scrid) {
-	return reconstitute(instrument(parse_script(source)[1], scrid));
+	return parser_utils.reconstitute(instrument(parse_script(source)[1], scrid));
 }
 
 function visualize_space(str) {

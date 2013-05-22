@@ -179,11 +179,15 @@ function deep_parse_tokens(tokens, params) {
 }
 
 function deep_parse_expr_tokens(tokens, params) {
-	var i, token, tmp;
+	var i, token;
 	for (i=0; i<tokens.length; i++) {
 		token = tokens[i];
 		if (token[0] === parser.OPERAND && token[1] === parser.SCRIPT) {
-			tmp = deep_parse(token[2], params);
+			deep_parse(token[2], params);
+		} else if (token[0] === parser.VAR && typeof token[2][1] !== 'string') {
+			deep_parse_tokens(token[2][1], params);
+		} else if (token[0] === parser.QUOTED) {
+			deep_parse_tokens(token[2], params);
 		}
 	}
 	return tokens;

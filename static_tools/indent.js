@@ -28,7 +28,7 @@ stdin.on('data', function(chunk){
 
 stdin.on('end', function(){
 	try {
-		console.log(
+		process.stdout.write(
 			parser_utils.reconstitute(
 				indent_code.indent(
 					parser.parse_script(source)

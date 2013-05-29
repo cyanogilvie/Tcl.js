@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-var requirejs = require('requirejs');
+var requirejs = require('requirejs'),
+	path = require('path');
+
 requirejs.config({
 	baseUrl: __dirname+'/..',
 	paths: {
@@ -96,7 +98,7 @@ parser_utils.for_each_file(process.argv.slice(2), function(fn, err, source){
 				}
 
 				if (calls[cx] === undefined) {calls[cx] = []};
-				calls[cx].push([cmd_text, fn, f_line, f_charnum, t_line, t_charnum]);
+				calls[cx].push([cmd_text, path.resolve(fn), f_line, f_charnum, t_line, t_charnum]);
 
 				if (calledby[cmd_text] === undefined) {calledby[cmd_text] = []};
 				if (calledby[cmd_text].indexOf(cx) === -1) {

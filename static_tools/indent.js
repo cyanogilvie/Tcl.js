@@ -37,10 +37,10 @@ stdin.on('end', function(){
 		);
 	} catch(e) {
 		if (e instanceof parser.ParseError) {
-			console.error('Parse error in "'+fn+'":\n'+e.pretty_print(source));
+			console.error('Parse error:\n'+e.pretty_print(source));
 			process.exit(1);
 		} else {
-			console.error('Unhandled error in "'+fn+'": '+e.message+':\n'+e.stack);
+			console.error('Unhandled error: '+e.message+':\n'+e.stack);
 			process.exit(1);
 		}
 	}

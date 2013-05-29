@@ -49,7 +49,7 @@ parser_utils.for_each_file(process.argv.slice(2), function(fn, err, source){
 	var m, flags = {
 		ignore: false
 	};
-	//console.warn('Examining "'+fn+'"');
+	console.warn('Examining "'+fn+'"');
 	if (err) {
 		console.err(err);
 		return;

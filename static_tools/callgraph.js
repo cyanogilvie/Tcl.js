@@ -22,9 +22,8 @@ requirejs([
 ){
 'use strict';
 
-var calls = {}, calledby = {},
-	cx = '', cx_stack = [],
-	local_seen = {}, local_seen_stack = [];
+var calledby = {},
+	cx = '', cx_stack = [];
 
 // Populate with built-in commands, to suppress output for those
 var ignore_cmds = {
@@ -67,22 +66,20 @@ parser_utils.for_each_file(process.argv.slice(2), function(fn, err, source){
 		parser_utils.deep_parse(parser.parse_script(source), {
 			descend: function(command, wordnum, type) {
 				if (type === parser.SCRIPTARG && parser_utils.get_text(command[0]) === 'proc') {
-					cx_stack.push(cx = parser_utils.get_text(command[1]));
-					local_seen_stack.push(local_seen = {});
+					cx_stack.push(cx);
+					cx = parser_utils.get_text(command[1]);
 				}
 			},
 
 			ascend: function(command, wordnum, type) {
 				if (type === parser.SCRIPTARG && parser_utils.get_text(command[0]) === 'proc') {
 					cx = cx_stack.pop();
-					local_seen = local_seen_stack.pop();
 				}
 			},
 
 			oncommand: function(cmd_text, command) {
 				if (
-					ignore_cmds.hasOwnProperty(cmd_text) ||
-					local_seen.hasOwnProperty(cmd_text)
+					ignore_cmds.hasOwnProperty(cmd_text)
 				) {
 					return;
 				}
@@ -97,13 +94,13 @@ parser_utils.for_each_file(process.argv.slice(2), function(fn, err, source){
 					return;
 				}
 
-				if (calls[cx] === undefined) {calls[cx] = []};
-				calls[cx].push([cmd_text, path.resolve(fn), f_line, f_charnum, t_line, t_charnum]);
-
-				if (calledby[cmd_text] === undefined) {calledby[cmd_text] = []};
-				if (calledby[cmd_text].indexOf(cx) === -1) {
-					calledby[cmd_text].push(cx);
-				}
+				if (calledby[cmd_text] === undefined) {
+					calledby[cmd_text] = {}
+				};
+				if (calledby[cmd_text][cx] === undefined) {
+					calledby[cmd_text][cx] = []
+				};
+				calledby[cmd_text][cx].push([path.resolve(fn), f_line, f_charnum, t_line, t_charnum]);
 			}
 		});
 	} catch(e) {
@@ -116,9 +113,6 @@ parser_utils.for_each_file(process.argv.slice(2), function(fn, err, source){
 		}
 	}
 }, function(){
-	console.log(tcllist.to_tcl({
-		calls: calls,
-		calledby: calledby
-	}));
+	console.log(tcllist.to_tcl(calledby));
 });
 });

@@ -30,7 +30,7 @@ proc callgraphs_fn {} {
 	error "No callgraph lookup file found"
 }
 
-set callgraphs	[readfile $callgraphs_fn]
+set callgraphs	[readfile [callgraphs_fn]]
 
 foreach caller [dict get $callgraphs calledby $cmd] {
 	foreach callrec [lmap c [dict get $callgraphs calls $caller] {

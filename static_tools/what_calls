@@ -11,7 +11,24 @@ proc readfile fn {
 	}
 }
 
-lassign $argv callgraphs_fn cmd
+lassign $argv cmd callgraphs_fn
+
+proc callgraphs_fn {} {
+	global callgraphs_fn
+
+	if {$callgraphs_fn ne ""} {
+		return $callgraphcs_fn
+	}
+
+	set dir	[file dirname [file normalize [info script]]]
+	while {$dir ne "/"} {
+		if {[file readable [file join $dir callgraphs]]} {
+			return [file join $dir callgraphs]
+		}
+		set dir	[file dirname $dir]
+	}
+	error "No callgraph lookup file found"
+}
 
 set callgraphs	[readfile $callgraphs_fn]
 

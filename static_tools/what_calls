@@ -1,0 +1,27 @@
+#!/usr/bin/env tclsh
+
+package require Tcl 8.6
+
+proc readfile fn {
+	set h	[open $fn r]
+	try {
+		read $h
+	} finally {
+		close $h
+	}
+}
+
+lassign $argv callgraphs_fn cmd
+
+set callgraphs	[readfile $callgraphs_fn]
+
+foreach caller [dict get $callgraphs calledby $cmd] {
+	foreach callrec [lmap c [dict get $callgraphs calls $caller] {
+		if {[lindex $c 0] ne $cmd} continue
+		set c
+	}] {
+		lassign $callrec caller_cmd fn f_line f_char t_line t_char
+		puts [list $caller_cmd $fn $f_line $f_char $t_line $t_char]
+	}
+}
+

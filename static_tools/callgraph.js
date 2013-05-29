@@ -102,10 +102,6 @@ parser_utils.for_each_file(process.argv.slice(2), function(fn, err, source){
 				}
 			}
 		});
-		console.log(tcllist.to_tcl({
-			calls: calls,
-			calledby: calledby
-		}));
 	} catch(e) {
 		if (e instanceof parser.ParseError) {
 			console.error('Parse error in "'+fn+'":\n'+e.pretty_print(source));
@@ -115,5 +111,10 @@ parser_utils.for_each_file(process.argv.slice(2), function(fn, err, source){
 			process.exit(1);
 		}
 	}
+}, function(){
+	console.log(tcllist.to_tcl({
+		calls: calls,
+		calledby: calledby
+	}));
 });
 });

@@ -20,10 +20,11 @@ proc callgraphs_fn {} {
 		return $callgraphcs_fn
 	}
 
-	set dir	[file dirname [file normalize [info script]]]
+	set dir	[pwd]
 	while {$dir ne "/"} {
-		if {[file readable [file join $dir callgraphs]]} {
-			return [file join $dir callgraphs]
+		set candidate	[file join $dir callgraph]
+		if {[file readable $candidate]} {
+			return $candidate
 		}
 		set dir	[file dirname $dir]
 	}

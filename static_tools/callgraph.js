@@ -84,9 +84,11 @@ parser_utils.for_each_file(process.argv.slice(2), function(fn, err, source){
 				) {
 					return;
 				}
-				var ofs = parser_utils.word_start(command[0]),
-					line = parser.find_line_no(source, ofs),
-					charnum = parser.find_line_ofs(source, ofs);
+				var range = parser_utils.command_range(command),
+					f_line = parser.find_line_no(source, range[0]),
+					f_charnum = parser.find_line_ofs(source, range[0]),
+					t_line = parser.find_line_no(source, range[1]),
+					t_charnum = parser.find_line_ofs(source, range[1]);
 
 				if (cmd_text == null) {
 					// Whitespace only command
@@ -94,7 +96,7 @@ parser_utils.for_each_file(process.argv.slice(2), function(fn, err, source){
 				}
 
 				if (calls[cx] === undefined) {calls[cx] = []};
-				calls[cx].push([cmd_text, fn, line, charnum]);
+				calls[cx].push([cmd_text, fn, f_line, f_charnum, t_line, t_charnum]);
 
 				if (calledby[cmd_text] === undefined) {calledby[cmd_text] = []};
 				if (calledby[cmd_text].indexOf(cx) === -1) {

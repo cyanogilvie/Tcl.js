@@ -43,9 +43,6 @@ proc win_closed {} {
 proc callers cx {
 	global browserwin oldwin
 
-	# for some reason we're getting a space appended
-	set cx	[string range $cx 0 end-1]
-
 	set oldwin	$vim::current(window)
 	if {![info exists browserwin]} {
 		puts "cx: $cx"

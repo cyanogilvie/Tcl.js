@@ -12,6 +12,8 @@ endfunction "}}}
 
 "execute 'tcl source "'.escape(expand("<sfile>:p:h").'/callgraph.tcl', '"[]$\').'"'
 
+let s:what_calls = expand("<sfile>:p:h").'/what_calls'
+
 function! Callers() "{{{
 	let l:cx = s:Cx_proc()
 	"execute 'tcl callers "'.escape(s:Cx_proc(), '"[]$\').'"'
@@ -27,7 +29,7 @@ if !exists("s:initialized")
 endif
 
 function s:HijackMake() "{{{
-	let &l:makeprg = expand("<sfile>:p:h").'/what_calls'
+	let &l:makeprg = s:what_calls
 endfunction "}}}
 
 augroup callgraph

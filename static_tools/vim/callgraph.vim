@@ -21,8 +21,7 @@ function! Callers() "{{{
 	let &l:statusline = 'Callers of "'.l:cx.'"'
 endfunction "}}}
 
-nnoremap <localleader>c :call Callers()<cr>
-nnoremap <C-[> :call Callers()<cr>
+nnoremap <localleader>[ :call Callers()<cr>
 
 if !exists("s:initialized")
 	let s:initialized = 1

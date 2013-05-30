@@ -35,7 +35,7 @@ if {![dict exists $callgraphs $cmd]} {
 	puts "# No callers found for \"$cmd\""
 	exit 0
 }
-puts "# Callers of \"$cmd\""
+#puts "# Callers of \"$cmd\""
 dict for {caller callrecs} [dict get $callgraphs $cmd] {
 	foreach callrec $callrecs {
 		lassign $callrec fn f_line f_char t_line t_char

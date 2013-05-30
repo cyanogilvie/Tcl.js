@@ -22,6 +22,8 @@ function! Callers() "{{{
 endfunction "}}}
 
 nnoremap <localleader>c :call Callers()<cr>
+nnoremap <C-[> :call Callers()<cr>
+
 if !exists("s:initialized")
 	let s:initialized = 1
 	"let &makeprg = expand("<sfile>:p:h").'/what_calls'

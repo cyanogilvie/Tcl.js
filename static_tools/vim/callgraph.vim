@@ -17,7 +17,7 @@ let s:what_calls = expand("<sfile>:p:h").'/what_calls'
 function! Callers() "{{{
 	let l:cx = s:Cx_proc()
 	"execute 'tcl callers "'.escape(s:Cx_proc(), '"[]$\').'"'
-	execute 'silent! make! "'.escape(l:cx, '"\').'" | copen'
+	execute 'silent! make! "'.escape(l:cx, '"\').'" | copen | redraw!'
 	let &l:statusline = 'Callers of "'.l:cx.'"'
 endfunction "}}}
 

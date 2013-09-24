@@ -21,8 +21,6 @@ function! Callers() "{{{
 	let &l:statusline = 'Callers of "'.l:cx.'"'
 endfunction "}}}
 
-nnoremap <localleader>[ :call Callers()<cr>
-
 if !exists("s:initialized")
 	let s:initialized = 1
 	"let &makeprg = expand("<sfile>:p:h").'/what_calls'
@@ -31,6 +29,7 @@ endif
 
 function s:HijackMake() "{{{
 	let &l:makeprg = s:what_calls
+	nnoremap <buffer> <localleader>[ :call Callers()<cr>
 endfunction "}}}
 
 augroup callgraph

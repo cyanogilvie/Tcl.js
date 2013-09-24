@@ -25,7 +25,7 @@ require([
 'use strict';
 
 var marked_up_parent,
-	m2 = new M2({host: 'localhost'}),
+	m2 = new M2({host: window.location.hostname}),
 	debugger_jmid,
 	scripts = {},
 	current_script = null,

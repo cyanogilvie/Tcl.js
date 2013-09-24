@@ -212,6 +212,13 @@ require([
 	dom.onclick('cs3', function(){
 		run('set acc 0; set i 10; puts "i before: $i"; while {[incr i -1]} {puts "loop i: $i"; incr acc $i}; puts $acc');
 	});
+	dom.onclick('cs4', function(){
+		run('foreach e {1 2 3} {puts "loop body, e: ($e)"}');
+		run('foreach {k v} {a 1 b 2 c 3} e {x y} {puts "loop body, k: ($k), v: ($v), e: ($e)"}');
+	});
+	dom.onclick('cs5', function(){
+		run('puts [lmap e {1 2 3} {expr {$e*2}}]');
+	});
 	dom.onclick('cf1', function(){
 		run('set v global; puts "v in global, before: ($v)"; proc p {v {d foo}} {puts "v in proc: ($v), d: ($d)"; set v updated}; p 1; puts "v in global, after: ($v)"');
 		run('set v global; puts "v in global, before: ($v)"; proc p {v {d foo}} {puts "v in proc: ($v), d: ($d)"; set v updated}; p; puts "v in global, after: ($v)"');

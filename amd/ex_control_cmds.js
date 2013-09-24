@@ -332,8 +332,8 @@ function install(interp){
 				interp.checkArgs(args, 3, 'varlist1 list1 ?varlist2 list2 ...? body');
 			}
 			var acc = collecting ? [] : undefined,
-				loopvardesc = args.slice(1, args.length-2),
-				body = args[args.length-1], i, j,
+				loopvardesc = args.slice(1, -1),
+				body = args[args.length-1], i=0, j,
 				varlists = [], lists = [], listptrs = [];
 
 			function done(){
@@ -356,7 +356,7 @@ function install(interp){
 				for (i=0; i<varlists.length; i++) {
 					for (j=0; j<varlists[i].length; j++) {
 						interp.set_scalar(varlists[i][j],
-							listptrs[i]++ || types.EmptyString);
+							lists[i][listptrs[i]++] || types.EmptyString);
 					}
 				}
 				return interp.exec(body, function(res){

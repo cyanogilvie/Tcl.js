@@ -284,7 +284,7 @@ function parse(text, mode, ofs) {
 	function parse_variable() {
 		var idx, save_i;
 
-		if (!/^([a-zA-Z0-9_{]|::)/.test(text.substr(i+1,2))) {
+		if (!/^([a-zA-Z0-9_{(]|::)/.test(text.substr(i+1,2))) {
 			token += text[i++];
 			return;
 		}
@@ -340,7 +340,7 @@ function parse(text, mode, ofs) {
 			}
 			emit([SYNTAX, text[i++]]);
 		} else {
-			token = text.substr(i).match(/[a-zA-Z_0-9:]+/)[0];
+			token = text.substr(i).match(/^[a-zA-Z_0-9:]*/)[0];
 			// : alone is a name terminator
 			idx = token.replace(/::/g, '__').indexOf(':');
 			if (idx > 0) {

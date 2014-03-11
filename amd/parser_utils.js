@@ -388,8 +388,10 @@ function deep_parse(script_tok, params) {
 
 		cmd_text = get_text(command[0]);
 		parse_info = cmd_parse_info[cmd_text];
-		params.oncommand(cmd_text, command);
-		if (parse_info === undefined) {continue;}
+		if (parse_info === undefined) {
+			params.oncommand(cmd_text, command);
+			continue;
+		}
 		special = typeof parse_info === 'function' ?
 			parse_info(command) : parse_info;
 		for (j=0; j<special.length; j+=2) {
@@ -449,6 +451,7 @@ function deep_parse(script_tok, params) {
 					break;
 			}
 		}
+		params.oncommand(cmd_text, command);
 	}
 	return script_tok;
 }

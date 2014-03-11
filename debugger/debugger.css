@@ -28,7 +28,7 @@ BODY, HTML {
 #marked_up_display {
 	position: absolute;
 	left: 0.5em; right: 0.5em;
-	top: 0.5em; bottom: 22.7em;
+	top: 0.5em; bottom: 22.2em;
 	margin: 0;
 }
 
@@ -36,8 +36,8 @@ BODY, HTML {
 	position: absolute;
 	left: 0.5em;
 	right: 0.5em;
-	bottom: 16.7em;
-	height: 1.7em;
+	bottom: 16em;
+	height: 2em;
 }
 
 #buttons > BUTTON {
@@ -45,17 +45,24 @@ BODY, HTML {
 	margin-right: 0px;
 }
 
-#console_result {
+#console_result_container {
 	position: absolute;
 	margin: 0;
-	padding: 0.3em;
-	height: 17.7em;
+	padding: 0;
+	height: 14em;
 	left: 0.5em; right: 0.5em;
-	bottom: 2.1em;
-	background: white;
+	bottom: 2em;
 	border: 1px solid black;
+}
+#console_result {
+	position: absolute;
+	top: 0; bottom: 0;
+	left: 0; right: 0;
+	margin: 0;
+	padding: 0.3em;
 	overflow-y: auto;
 	white-space: pre-wrap;
+	background: white;
 }
 
 .question {
@@ -71,14 +78,25 @@ BODY, HTML {
 	font-size: 0.9em;
 }
 
-#console_input {
+#console_input_container {
 	position: absolute;
-	padding: 0; margin: 0;
 	height: 1.5em;
 	left: 0.5em; right: 0.5em;
+	border: 1px solid black;
 	bottom: 0.5em;
 	background: white;
-	border: 1px solid black;
+	padding: 0 0.4em;
+	margin: 0;
+}
+
+#console_input {
+	padding: 0; margin: 0;
+	border: 0px;
+	background: white;
+	width: 100%;
+	height: 100%;
+	outline: none;
+	-webkit-appearance: none;
 }
 
 #parse_feedback {

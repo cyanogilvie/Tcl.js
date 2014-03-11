@@ -13,9 +13,9 @@ var iface,
 	'if': function(words){
 		var special = [
 			1, EXPRARG
-		], wordtext, p;
+		], wordtext, p, last=last_real_word_number(words);
 
-		for (p=2; p<words.length; p++) {
+		for (p=2; p<=last; p++) {
 			wordtext = get_text(words[p]);
 			switch (wordtext) {
 				case 'then':
@@ -35,7 +35,7 @@ var iface,
 	},
 
 	'expr':		function(words){
-		return words.length === 1 ? [1, EXPRARG] : [];
+		return last_real_word_number(words) === 1 ? [1, EXPRARG] : [];
 	},
 	'foreach':	function(words){
 		return [last_real_word_number(words), SCRIPTARG];

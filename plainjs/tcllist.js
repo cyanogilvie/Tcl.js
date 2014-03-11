@@ -505,6 +505,7 @@ var tcllist = (function(){
 				if (from instanceof Array) {
 					staged = [];
 					for (i=0; i<from.length; i++) {
+						if (from[i] == null) continue;
 						staged.push(quote_elem(to_tcl(from[i])));
 					}
 					return staged.join(' ');
@@ -516,7 +517,7 @@ var tcllist = (function(){
 					// hopefully a generic object or instance of Function
 					staged = [];
 					for (e in from) {
-						if (from.hasOwnProperty(e)) {
+						if (from.hasOwnProperty(e) && from[e] != null) {
 							staged.push(quote_elem(e));
 							staged.push(quote_elem(to_tcl(from[e])));
 						}
@@ -528,6 +529,10 @@ var tcllist = (function(){
 				return String(from);
 			case 'string':
 				return from;
+
+			case null:
+			case undefined:
+				return '';
 
 			default:
 				throw new Error('Cannot convert type: ' + typeof from);

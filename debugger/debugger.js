@@ -4,7 +4,7 @@ require([
 	'tcl/parser',
 	'tcl/parser_utils',
 	'tcl/list',
-	'./dom',
+	'./dom.js',
 	'm2/m2',
 	'cflib/log',
 	'dojo/on',

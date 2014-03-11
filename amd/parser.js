@@ -656,17 +656,6 @@ function parse(text, mode, ofs) {
 				continue;
 			}
 			if (m = (
-				/^[\-+]?\d+(?:(\.)(?:\d+)?)?(e[\-+]?\d+)?/i.exec(here) ||
-				/^[\-+]?(\.)\d+(e[\-+]?\d+)?/i.exec(here)
-			)) {
-				if (m[1] === undefined && m[2] === undefined) {
-					emit_token(OPERAND, m[0], INTEGER, Number(m[0]));
-				} else {
-					emit_token(OPERAND, m[0], FLOAT, Number(m[0]));
-				}
-				continue;
-			}
-			if (m = (
 				/^([\-+])?(0x)([\dA-F]+)/i.exec(here) ||
 				/^([\-+])?(0b)([01]+)/i.exec(here) ||
 				/^([\-+])?(0o)([0-7]+)/i.exec(here)
@@ -677,6 +666,17 @@ function parse(text, mode, ofs) {
 						{'': 10, '0x': 16, '0b': 2, '0o': 8}[m[2]]
 					)
 				);
+				continue;
+			}
+			if (m = (
+				/^[\-+]?\d+(?:(\.)(?:\d+)?)?(e[\-+]?\d+)?/i.exec(here) ||
+				/^[\-+]?(\.)\d+(e[\-+]?\d+)?/i.exec(here)
+			)) {
+				if (m[1] === undefined && m[2] === undefined) {
+					emit_token(OPERAND, m[0], INTEGER, Number(m[0]));
+				} else {
+					emit_token(OPERAND, m[0], FLOAT, Number(m[0]));
+				}
 				continue;
 			}
 

@@ -5,6 +5,7 @@ require([
 	'tcl/parser_utils',
 	'js/text!./examples/example1.tcl',
 	'js/text!./examples/example2.tcl',
+	'js/text!./examples/example3.tcl',
 	'dom',
 	'time',
 
@@ -14,6 +15,7 @@ require([
 	parser_utils,
 	example1,
 	example2,
+	example3,
 	dom,
 	time
 ){
@@ -31,7 +33,11 @@ function parse_script() {
 	try {
 		parsed = time(
 			deep ?
-				function(){ return parser_utils.deep_parse(parser.parse_script(script_str)); } :
+				function(){ return parser_utils.deep_parse(parser.parse_script(script_str), {
+					oncommand: function(cmd_text, command) {
+						//console.warn('Saw command "'+cmd_text+'", at ofs: '+parser_utils.word_start(parser_utils.real_words(command)[0]))
+					}
+				}); } :
 				function(){ return parser.parse_script(script_str); },
 			function(elapsed){
 				dom.innerText('parse_feedback',
@@ -137,6 +143,17 @@ function display_token(token, parent) {
 			break;
 
 		case parser.SUBSTARG:
+			node = dom.create('div', {}, parent, '['+tokname(type)+', ');
+			subnode = dom.create('div', {style: {marginLeft: '2em'}}, node);
+			for (i=0; i<token[2].length; i++) {
+				display_token(token[2][i], subnode);
+			}
+			dom.appendText(node, [
+				markup_tok_element(token[3]), ']'
+			]);
+			break;
+
+		case parser.SWITCHARG:
 			node = dom.create('div', {}, parent, '['+tokname(type)+', ');
 			subnode = dom.create('div', {style: {marginLeft: '2em'}}, node);
 			for (i=0; i<token[2].length; i++) {
@@ -316,6 +333,7 @@ load_script(example1);
 
 dom.onclick('example1', function(){load_script(example1);});
 dom.onclick('example2', function(){load_script(example2);});
+dom.onclick('example3', function(){load_script(example3);});
 dom.onclick('parse_script_button', parse_script);
 dom.byId('hide_noise').onchange = configure_noise;
 dom.byId('deep_parse').onchange = parse_script;

@@ -316,6 +316,16 @@ function instrument(commands, scrid) {
 							}
 						}
 						break;
+					case parser.SUBSTARG:
+						for (l=0; l<token[2].length; l++)
+							if (token[2][l][0] === parser.SCRIPT)
+								token[2][l][1] = instrument(token[2][l][1], scrid);
+						break;
+					case parser.SWITCHARG:
+						for (l=0; l<token[2].length; l++)
+							if (token[2][l][0] === parser.SCRIPT)
+								token[2][l][1] = instrument(token[2][l][1], scrid);
+						break;
 					case parser.END:
 						endtok = word.pop();
 						/*
@@ -464,6 +474,18 @@ function display_token(token, scrid) {
 		case parser.EXPRARG:
 			for (i=0; i<token[2].length; i++) {
 				newnode = display_expr_token(token[2][i]);
+			}
+			break;
+
+		case parser.SUBSTARG:
+			for (i=0; i<token[2].length; i++) {
+				display_token(token[2][i], scrid);
+			}
+			break;
+
+		case parser.SWITCHARG:
+			for (i=0; i<token[2].length; i++) {
+				display_token(token[2][i], scrid);
 			}
 			break;
 

@@ -48,9 +48,9 @@ var iface,
 	'subst':	function(words){ return [last_real_word_number(words), SUBSTARG]; },
 	'time':		[1, SCRIPTARG],
 	'switch':	function(words){
-		var i=1, specials=[], skipping_args=true;
+		var i=1, specials=[], skipping_args=true, last=last_real_word_number(words);
 
-		while (skipping_args && i<words.length) {
+		while (skipping_args && i<=last) {
 			switch (get_text(words[i])) {
 				case '-exact':
 				case '-glob':
@@ -73,10 +73,10 @@ var iface,
 		}
 
 		i++;	// String argument
-		if (words.length - i === 1) {
+		if (last === i) {
 			specials.push(i, SWITCHARG);
 		} else {
-			while (i<words.length) {
+			while (i <= last) {
 				specials.push(i+1, SCRIPTARG);
 				i+=2;
 			}
@@ -323,6 +323,50 @@ function list_elements(listtokens) {
 	return out;
 }
 
+function deep_parse_switch_args(switch_body, ofs, params) {
+	var i, listtokens, token, out=[], e=0, etoks=[];
+	listtokens = parser.parse_list(switch_body, ofs);
+
+	function emit_elem() {
+		var j, tok, ofs;
+		if (etoks.length > 0) {
+			if (e++ % 2 == 0) {
+				for (j=0; j<etoks.length; j++)
+					out.push(etoks[j]);
+			} else {
+				for (j=0; j<etoks.length; j++) {
+					if (ofs == null) {ofs = etoks[j][3];}
+					if (tok == null) {tok = '';}
+					tok += etoks[j][2] || etoks[j][1];
+				}
+				if (tok === '-') {
+					for (j=0; j<etoks.length; j++)
+						out.push(etoks[j]);
+				} else {
+					out.push(deep_parse(parser.parse_script(tok, ofs), params));
+				}
+			}
+			etoks = [];
+		}
+	}
+
+	for (i=0; i<listtokens.length; i++) {
+		token = listtokens[i];
+		switch (token[0]) {
+			case parser.TEXT:
+			case parser.ESCAPE:
+				etoks.push(token);
+				break;
+
+			default:
+				emit_elem();
+				out.push(token);
+		}
+	}
+
+	return out;
+}
+
 function deep_parse(script_tok, params) {
 	var commands=script_tok[1], command, i, j, k, parse_info, special, txt, ofs,
 		cmd_text, elems, ei;
@@ -395,10 +439,12 @@ function deep_parse(script_tok, params) {
 				case SWITCHARG:
 					ofs = word_start(command[k]);
 					params.descend(command, k, SWITCHARG);
-					elems = list_elements(parser.parse_list(get_text(command[k]), ofs));
-					for (ei=1; ei<elems.length; ei+=2) {
-						deep_parse(parser.parse_script(elems[ei][0], elems[ei][1]), params);
-					}
+					command[k] = replace_static(command[k], [
+						SWITCHARG,
+						command[k].slice(),
+						deep_parse_switch_args(get_text(command[k]), ofs, params),
+						ofs
+					]);
 					params.ascend(command, k, SWITCHARG);
 					break;
 			}
@@ -490,6 +536,8 @@ function reconstitute_word(word) {
 				script += reconstitute_word(token[2]);
 				break;
 			case parser.SWITCHARG:
+				script += reconstitute_word(token[2]);
+				break;
 			default:
 				script += token[1];
 		}

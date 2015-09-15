@@ -47,7 +47,52 @@ var iface,
 	'catch':	[1, SCRIPTARG],
 	'subst':	function(words){ return [last_real_word_number(words), SUBSTARG]; },
 	'time':		[1, SCRIPTARG],
-	'switch':	function(words){
+	'namespace': function(words){
+		var specials=[], i, last=last_real_word_number(words);
+		switch (get_text(words[1])) {
+			case 'eval':
+				for (i=3; i<last; i++) {
+					specials.push(i, SCRIPTARG);
+				}
+				break;
+		}
+		return specials;
+	},
+	'try': function(words){
+		var i=2, specials=[], last=last_real_word_number(words);
+		specials.push(1, SCRIPTARG);
+		while (i <= last) {
+			switch (get_text(words[i])) {
+				case 'on':
+				case 'trap':
+					specials.push(i+2, SCRIPTARG);
+					i += 3;
+					break;
+
+				case 'finally':
+					specials.push(i+1, SCRIPTARG);
+					i += 2;
+					break;
+			}
+		}
+	},
+	'eval': function(words){
+		var i, specials=[], last=last_real_word_number(words);
+		for (i=1; i<last; i++) {
+			specials.push(i, SCRIPTARG);
+		}
+	},
+	'uplevel': function(words){
+		var i=1, specials=[], last=last_real_word_number(words);
+
+		if (/^[0-9#]/.test(get_text(words[i])))
+			i++;
+
+		while (i <= last) {
+			specials.push(i++, SCRIPTARG);
+		}
+	},
+	'switch': function(words){
 		var i=1, specials=[], skipping_args=true, last=last_real_word_number(words);
 
 		while (skipping_args && i<=last) {
@@ -330,7 +375,7 @@ function deep_parse_switch_args(switch_body, ofs, params) {
 	function emit_elem() {
 		var j, tok, ofs;
 		if (etoks.length > 0) {
-			if (e++ % 2 == 0) {
+			if (e++ % 2 === 0) {
 				for (j=0; j<etoks.length; j++)
 					out.push(etoks[j]);
 			} else {

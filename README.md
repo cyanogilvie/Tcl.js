@@ -8,7 +8,7 @@ Why Tcl in a Browser?
 
 I use Tcl extensively as an extension language, or to implement domain specific languages for configuration or defining custom behaviour for business objects.  These Tcl scripts often come from users, so Tcl's safe interpreters provided a nice sandbox for running these scripts.
 
-The market has changed, and no longer wants to install native applications (in Tk, or anything else for that matter), particularly in an enterprise environment.  To address this we moved our frontend application to Javascript in a browser, which also extends the reach to mobile devices.  But the frontend still needs to support all the existing DSL code, and rewriting it in Javascript wouldn't solve it because running untrusted Javascript scripts in the browser (via eval or new Function) is an unaceptable security and stability risk.  This interpreter addresses both these concerns.
+The market has changed, and no longer wants to install native applications (in Tk, or anything else for that matter), particularly in an enterprise environment.  To address this we moved our frontend application to Javascript in a browser, which also extends the reach to mobile devices.  But the frontend still needs to support all the existing DSL code, and rewriting it in Javascript wouldn't solve it because running untrusted Javascript scripts in the browser (via eval or new Function) is an unacceptable security and stability risk.  This interpreter addresses both these concerns.
 
 Why Another One?
 ----------------
@@ -99,6 +99,8 @@ The timings are as follows (on my MacBook Air with a Core i5 @ 1.8GHz):
 
 So it's around 3 times slower than the c interpreter on this benchmark.
 On other browsers it's a very different story unfortunately.  Safari clocks in at about 68000 microseconds, and Firefox (v18.0.1 - with the shiny new IonMonkey engine) manages 140599 microseconds.  I haven't the stomach (or the platform) to test IE.
+
+2015 update: Performance in Firefox 40 is roughly on par with Chrome now.
 
 What Is The License?
 --------------------

@@ -508,7 +508,9 @@ function to_tcl(from) { //<<<
 		case 'boolean': return from ? '1' : '0';
 		case 'function':
 		case 'object':
-			if (from instanceof Array) {
+			if (from instanceof types.TclObject) {
+				return from.toString();
+			} else if (from instanceof Array) {
 				staged = [];
 				for (i=0; i<from.length; i++) {
 					if (from[i] == null) continue;

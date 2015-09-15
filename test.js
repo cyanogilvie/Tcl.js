@@ -169,6 +169,9 @@ require([
 	dom.onclick('test6', function(){
 		run(scriptobj);
 	});
+	dom.onclick('list1', function(){
+		run('list foo bar');
+	});
 	dom.onclick('test7', function(){
 		run('set d {a A b B c C}; dict get $d b');
 	});

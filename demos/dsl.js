@@ -49,7 +49,7 @@ function render_entries(cooked_entries) {
 		txt += ', title: ' + entry.title;
 		txt += ', score: ' + entry.score;
 
-		// Need to use .GetBool() otherwise JS value truthiness interferes
+		// Need to use .GetBool() otherwise JS value truthiness interferes.  Also needed to normalize Tcl truthiness values: "on", "y", etc
 		if (entry.verified.GetBool()) {
 			txt += ' ✓ verified';
 		} else {

@@ -15,19 +15,19 @@ var i, raw_entries, I=Interp();
 
 raw_entries = [
 	{
-		id: 1,
+		id: 10,
 		verified: true,
 		title: "First Title",
 		score: 1.0
 	},
 	{
-		id: 2,
+		id: 11,
 		verified: false,
 		title: "Second Title",
 		score: 1.0
 	},
 	{
-		id: 3,
+		id: 12,
 		verified: true,
 		title: "Third Title",
 		score: 1.0
@@ -44,10 +44,12 @@ function render_entries(cooked_entries) {
 		txt = '';
 		entry = list[i].GetDict();
 
-		txt += 'id: ' + entry.id.GetInt();
-		txt += ', title: ' + entry.title.GetString();		// This could just be entry.title, using the implicit .toString()
-		txt += ', score: ' + Number(entry.score);
+		// Using implicit .toString() below.  Could call entry.id.GetInt() to force conversion to an integer, for instance
+		txt += 'id: ' + entry.id;
+		txt += ', title: ' + entry.title;
+		txt += ', score: ' + entry.score;
 
+		// Need to use .GetBool() otherwise JS value truthiness interferes
 		if (entry.verified.GetBool()) {
 			txt += ' ✓ verified';
 		} else {
@@ -55,7 +57,7 @@ function render_entries(cooked_entries) {
 		}
 
 		if (entry.hasOwnProperty('extra')) {
-			txt += ', extra: ' + entry.extra;		// Using implicit .toString();
+			txt += ', extra: ' + entry.extra;
 		}
 
 		node = $('<li>');

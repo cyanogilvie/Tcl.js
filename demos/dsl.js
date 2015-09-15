@@ -1,13 +1,11 @@
 /*jshint eqnull:true */
 /*global require */
 require([
-	'time',
 	'js/text!./dsl_scripts/annotate_entries.tcl',
 	'tcl/interp',
 
 	'js/domReady!'
 ], function(
-	time,
 	dsl_script,
 	Interp
 ){

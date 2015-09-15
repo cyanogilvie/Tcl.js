@@ -1,11 +1,9 @@
 # Variable "entries" is set to a list of dicts
 
-return [lmap in $entries {
-	incr i
-
+lmap in $entries {
 	set out	[dict merge $in [list \
 		score		[expr {[dict get $in score] + rand()*4.0}] \
-		extra		"Added by Tcl DSL script, i: $i" \
+		extra		"Added by Tcl DSL script, i: [incr i]" \
 	]]
 
 	if {[dict get $in verified]} {
@@ -13,4 +11,4 @@ return [lmap in $entries {
 	}
 
 	set out
-}]
+}

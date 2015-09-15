@@ -86,8 +86,14 @@ function install(interp) {
 
 	interp.registerCommand('incr', function(args){
 		interp.checkArgs(args, [1, 2], 'varname ?increment?');
-		var intobj = interp.get_var(args[1], true),
+		var intobj,
 			increment = args[2] === undefined ? 1 : args[2].GetInt();
+
+		if (!interp.var_exists(args[1])) {
+			interp.set_var(args[1], new IntObj(0));;
+		}
+		intobj = interp.get_var(args[1], true);
+
 		intobj.jsval = intobj.GetInt() + increment;
 		intobj.InvalidateCaches();
 		return intobj;

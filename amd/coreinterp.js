@@ -1345,6 +1345,9 @@ return function(/* extensions... */){
 		if (stack.length) {
 			throw new Error('Expr stack not empty at end of compile: '+stack);
 		}
+		if (f === undefined) {
+			f = function(){return '';};
+		}
 		exprObj.cache.expr_f = f;
 		return f;
 	}

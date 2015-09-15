@@ -45,11 +45,13 @@ var dicthandlers = {
 		obj.bytes = list.array2list(a);
 	},
 	setFromAny: function(obj){
-		var i, jsval = obj.jsval, a, d = {};
+		var i, jsval = obj.jsval, a, d, e;
 		if (jsval === null) {
 			obj.handlers.updateJsVal(obj);
 		}
-		if (!(jsval instanceof Array)) {
+		if (jsval instanceof Array) {
+			a = jsval;
+		} else {
 			switch (typeof jsval) {
 				case 'string':
 					a = list.list2array(jsval);
@@ -59,20 +61,32 @@ var dicthandlers = {
 					if (jsval instanceof String) {
 						a = list.list2array(jsval);
 					} else {
-						throw new Error('Cannot convert type to dict: "'+typeof jsval+'"');
+						//throw new Error('Cannot convert type to dict: "'+typeof jsval+'"');
+						d = {};
+						for (e in jsval) {
+							if (jsval.hasOwnProperty(e)) {
+								d[e] = tclobj.AsObj(jsval[e]);
+								d[e].IncrRefCount();
+							}
+						}
 					}
 					break;
 				default:
 					throw new Error('Cannot convert type to dict');
 			}
 		}
-		if (a.length % 2 !== 0) {
-			throw new Error('No value for key: "'+a[a.length-1]+'"');
+
+		if (d === undefined) {
+			if (a.length % 2 !== 0) {
+				throw new Error('No value for key: "'+a[a.length-1]+'"');
+			}
+			d = {};
+			for (i=0; i<a.length; i+=2) {
+				d[a[i]] = tclobj.AsObj(a[i+1]);
+				d[a[i]].IncrRefCount();
+			}
 		}
-		for (i=0; i<a.length; i+=2) {
-			d[a[i]] = tclobj.AsObj(a[i+1]);
-			d[a[i]].IncrRefCount();
-		}
+
 		obj.FreeJsVal();
 		obj.jsval = d;
 	}

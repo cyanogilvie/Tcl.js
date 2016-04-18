@@ -824,6 +824,7 @@ function parse(text, mode, ofs) {
 						break;
 				}
 			}
+			emit_waiting(TEXT);
 			return tokens;
 		default:
 			throw new Error('Invalid parse mode: "'+mode+'"');

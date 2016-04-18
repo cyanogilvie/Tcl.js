@@ -482,13 +482,14 @@ function deep_parse(script_tok, params) {
 
 				case SUBSTARG:
 					ofs = word_start(command[k]);
+					params.descend(command, k, SUBSTARG);
 					command[k] = replace_static(command[k], [
 						SUBSTARG,
 						command[k].slice(),
 						parser.parse_subst(txt, ofs),
 						ofs
 					]);
-					deep_parse_tokens(command[k][2][2], params);
+					params.ascend(command, k, SUBSTARG);
 					break;
 
 				case SWITCHARG:

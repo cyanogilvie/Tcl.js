@@ -412,6 +412,13 @@ function deep_parse_switch_args(switch_body, ofs, params) {
 	return out;
 }
 
+function get_cmd_parse_info(params, cmd_text) {
+	if (cmd_parse_info[cmd_text] !== undefined)
+		return cmd_parse_info[cmd_text];
+
+	return params.get_cmd_parse_info == null ? null : params.get_cmd_parse_info(params, cmd_text);
+}
+
 function deep_parse(script_tok, params) {
 	var commands=script_tok[1], command, i, j, k, parse_info, special, txt, ofs,
 		cmd_text, elems, ei;
@@ -432,8 +439,8 @@ function deep_parse(script_tok, params) {
 		}
 
 		cmd_text = get_text(command[0]);
-		parse_info = cmd_parse_info[cmd_text];
-		if (parse_info === undefined) {
+		parse_info = get_cmd_parse_info(params, cmd_text);
+		if (parse_info == null) {
 			params.oncommand(cmd_text, command);
 			continue;
 		}
@@ -441,6 +448,7 @@ function deep_parse(script_tok, params) {
 			parse_info(command) : parse_info;
 		for (j=0; j<special.length; j+=2) {
 			k = special[j];
+			//console.warn(cmd_text+' k: '+k+', command.length: '+command.length);
 			txt = get_text(command[k], true);
 			if (txt == null) {
 				// word text is dynamic - comes from a variable or
@@ -620,6 +628,7 @@ iface = {
 	'tokname': tokname,
 	'visualize_space': visualize_space,
 	'real_words': real_words,
+	'last_real_word_number': last_real_word_number,
 	'toklength': toklength,
 	'reconstitute_expr': reconstitute_expr,
 	'reconstitute_word': reconstitute_word,

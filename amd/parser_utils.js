@@ -51,7 +51,7 @@ var iface,
 		var specials=[], i, last=last_real_word_number(words);
 		switch (get_text(words[1])) {
 			case 'eval':
-				for (i=3; i<last; i++) {
+				for (i=3; i<=last; i++) {
 					specials.push(i, SCRIPTARG);
 				}
 				break;
@@ -65,22 +65,30 @@ var iface,
 			switch (get_text(words[i])) {
 				case 'on':
 				case 'trap':
-					specials.push(i+2, SCRIPTARG);
-					i += 3;
+					specials.push(i+3, SCRIPTARG);
+					i += 4;
 					break;
 
 				case 'finally':
 					specials.push(i+1, SCRIPTARG);
 					i += 2;
 					break;
+
+				default:
+					// We're out of sync or dealing with an invalid syntax for
+					// try - no way to recover, best we can do is send back
+					// what we've found so far
+					return specials;
 			}
 		}
+		return specials;
 	},
 	'eval': function(words){
 		var i, specials=[], last=last_real_word_number(words);
-		for (i=1; i<last; i++) {
+		for (i=1; i<=last; i++) {
 			specials.push(i, SCRIPTARG);
 		}
+		return specials;
 	},
 	'uplevel': function(words){
 		var i=1, specials=[], last=last_real_word_number(words);
@@ -91,6 +99,7 @@ var iface,
 		while (i <= last) {
 			specials.push(i++, SCRIPTARG);
 		}
+		return specials;
 	},
 	'switch': function(words){
 		var i=1, specials=[], skipping_args=true, last=last_real_word_number(words);

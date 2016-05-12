@@ -35,7 +35,8 @@ var iface, e,
 	SCRIPTARG	= 24,
 	EXPRARG		= 25,
 	SUBSTARG	= 26,
-	SWITCHARG	= 27,
+	//SWITCHARG	= 27,  No longer used - switch parses to LISTARG now
+	LISTARG		= 28,
 	t = {
 		TEXT	: TEXT,
 		SPACE	: SPACE,
@@ -65,7 +66,7 @@ var iface, e,
 		SCRIPTARG	: SCRIPTARG,
 		EXPRARG		: EXPRARG,
 		SUBSTARG	: SUBSTARG,
-		SWITCHARG	: SWITCHARG
+		LISTARG		: LISTARG
 	}, operators = [
 		/^(?:~|!(?=[^=]))/,	1,
 		/^\*\*/,			2,
@@ -759,21 +760,105 @@ function parse(text, mode, ofs) {
 		}
 	}
 
-	function tokenize_list() {
-		var m;
+	function parse_list_element(cx) {
+		var start=i, depth=1;
+
+		if (cx != null) {
+			emit([SYNTAX, text[i++]]);
+		}
+
+		function is_whitespace(c) {
+			switch (c) {
+				case undefined:
+				case '\t':
+				case '\n':
+				case '\v':
+				case '\f':
+				case '\r':
+				case ' ': // Definitive whitespace list from http://tip.tcl.tk/407
+					return true;
+			}
+
+			return false;
+		}
 
 		while (true) {
-			if ((m = /^\s+/.exec(text.substr(i)))) {
+			if (cx === '"') {
+				switch (text[i]) {
+					case undefined:
+						throw new ParseError('missing "', start, text, ofs);
+
+					case '"':
+						if (!is_whitespace(text[i+1])) {
+							throw new ParseError('list element in quotes followed by "'+text[i+1]+'" instead of space', i+1, text, ofs);
+						}
+						emit_waiting(TEXT);
+						emit([SYNTAX, text[i++]]);
+						return tokens;
+				}
+			} else if (cx === '{') {
+				switch (text[i]) {
+					case undefined:
+						throw new ParseError('missing }', start, text, ofs);
+
+					case '{':
+						depth++;
+						continue;
+
+					case '}':
+						if (--depth === 0) {
+							if (!is_whitespace(text[i+1])) {
+								throw new ParseError('list element in braces followed by "'+text[i+1]+'" instead of space', i+1, text, ofs);
+							}
+							emit_waiting(TEXT);
+							emit([SYNTAX, text[i++]]);
+							return tokens;
+						}
+						continue;
+				}
+			} else if (is_whitespace(text[i])) {
+				emit_waiting(TEXT);
+				return tokens;
+			}
+
+			if (text[i] == '\\') {
+				if (cx === '{') {
+					token += text[i++];
+					if (text[i] === undefined) throw new ParseError('missing }', start, text, ofs);
+					token += text[i++];
+				} else {
+					parse_escape();
+				}
+			} else {
+				token += text[i++];
+			}
+		}
+	}
+
+	function tokenize_list() {
+		var m, cx;
+
+		while (true) {
+			if ((m = /^[\t\n\v\f\r ]+/.exec(text.substr(i)))) {
 				emit([SPACE, m[0]]);
 				i += m[0].length;
 			}
 
 			switch (text[i]) {
-				case undefined:	return tokens;
-				case '{':		parse_braced();					break;
-				case '"':		parse_combined(true, false);	break;
-				default:		parse_combined(false, false);	break;
+				case undefined:
+					return tokens;
+
+				case '{':
+				case '"':
+					cx = text[i];
+					break;
+
+				default:
+					cx = null;
+					break;
 			}
+
+			parse_list_element(cx);
 		}
 	}
 

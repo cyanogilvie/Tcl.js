@@ -1,14 +1,20 @@
 /*jshint eqnull:true */
 /*global define */
 
-define(['tcl/parser'], function(parser){
+define([
+	'tcl/parser',
+	'tcl/list'
+], function(
+	parser,
+	tcllist
+){
 'use strict';
 
 var iface,
 	EXPRARG = parser.EXPRARG,
 	SCRIPTARG = parser.SCRIPTARG,
 	SUBSTARG = parser.SUBSTARG,
-	SWITCHARG = parser.SWITCHARG,
+	LISTARG = parser.LISTARG,
 	cmd_parse_info = {
 	'if': function(words){
 		var special = [
@@ -102,7 +108,7 @@ var iface,
 		return specials;
 	},
 	'switch': function(words){
-		var i=1, specials=[], skipping_args=true, last=last_real_word_number(words);
+		var i=1, specials=[], skipping_args=true, last=last_real_word_number(words), listwords, j, subspecials;
 
 		while (skipping_args && i<=last) {
 			switch (get_text(words[i])) {
@@ -128,7 +134,14 @@ var iface,
 
 		i++;	// String argument
 		if (last === i) {
-			specials.push(i, SWITCHARG);
+			subspecials = [];
+			listwords = tcllist.list2array(get_text(words[i]));
+
+			for (j=1; j<listwords.length; j+=2)
+				if (listwords[j] !== '-')
+					subspecials.push(j, SCRIPTARG);
+
+			specials.push(i, subspecials);
 		} else {
 			while (i <= last) {
 				specials.push(i+1, SCRIPTARG);
@@ -377,48 +390,34 @@ function list_elements(listtokens) {
 	return out;
 }
 
-function deep_parse_switch_args(switch_body, ofs, params) {
-	var i, listtokens, token, out=[], e=0, etoks=[];
-	listtokens = parser.parse_list(switch_body, ofs);
-
-	function emit_elem() {
-		var j, tok, ofs;
-		if (etoks.length > 0) {
-			if (e++ % 2 === 0) {
-				for (j=0; j<etoks.length; j++)
-					out.push(etoks[j]);
-			} else {
-				for (j=0; j<etoks.length; j++) {
-					if (ofs == null) {ofs = etoks[j][3];}
-					if (tok == null) {tok = '';}
-					tok += etoks[j][2] || etoks[j][1];
-				}
-				if (tok === '-') {
-					for (j=0; j<etoks.length; j++)
-						out.push(etoks[j]);
-				} else {
-					out.push(deep_parse(parser.parse_script(tok, ofs), params));
-				}
-			}
-			etoks = [];
-		}
-	}
+function list_words(listtokens) { // Convert to command-style list of words
+	var i, token, word=[], words=[];
 
 	for (i=0; i<listtokens.length; i++) {
 		token = listtokens[i];
-		switch (token[0]) {
-			case parser.TEXT:
-			case parser.ESCAPE:
-				etoks.push(token);
-				break;
 
-			default:
-				emit_elem();
-				out.push(token);
+		// Leading space tokens are part of the first word
+		if (word.length > 0 && token[0] == parser.SPACE) {
+			words.push(word);
+			word = [];
 		}
+
+		word.push(token);
 	}
 
-	return out;
+	if (word.length > 0)
+		words.push(word);
+
+	return words;
+}
+
+function deep_parse_list_arg(list_arg, special, ofs, params) {
+	var words;
+
+	words = list_words(parser.parse_list(list_arg, ofs));
+	apply_specials(words, special, params);
+
+	return words;
 }
 
 function get_cmd_parse_info(params, cmd_text) {
@@ -428,42 +427,32 @@ function get_cmd_parse_info(params, cmd_text) {
 	return params.get_cmd_parse_info == null ? null : params.get_cmd_parse_info(params, cmd_text);
 }
 
-function deep_parse(script_tok, params) {
-	var commands=script_tok[1], command, i, j, k, parse_info, special, txt, ofs,
-		cmd_text, elems, ei;
+function apply_specials(command, special, params) {
+	var j, k, ofs, txt;
 
-	if (params === undefined) {
-		params = {};
-	}
-	if (params.oncommand === undefined) { params.oncommand = function(){}; }
-	if (params.descend === undefined) { params.descend = function(){}; }
-	if (params.ascend === undefined) { params.ascend = function(){}; }
-
-	for (i=0; i<commands.length; i++) {
-		command = commands[i];
-
-		// Scan for SCRIPT tokens to recurse into
-		for (j=0; j<command.length; j++) {
-			deep_parse_tokens(command[j], params);
-		}
-
-		cmd_text = get_text(command[0]);
-		parse_info = get_cmd_parse_info(params, cmd_text);
-		if (parse_info == null) {
-			params.oncommand(cmd_text, command);
+	for (j=0; j<special.length; j+=2) {
+		k = special[j];
+		//console.warn(cmd_text+' k: '+k+', command.length: '+command.length);
+		txt = get_text(command[k], true);
+		if (txt == null) {
+			// word text is dynamic - comes from a variable or
+			// result of a command, so we can't statically parse it
 			continue;
 		}
-		special = typeof parse_info === 'function' ?
-			parse_info(command) : parse_info;
-		for (j=0; j<special.length; j+=2) {
-			k = special[j];
-			//console.warn(cmd_text+' k: '+k+', command.length: '+command.length);
-			txt = get_text(command[k], true);
-			if (txt == null) {
-				// word text is dynamic - comes from a variable or
-				// result of a command, so we can't statically parse it
-				continue;
-			}
+
+		if (Array.isArray(special[j+1])) {
+			// Word j is a list, with specials given by the array special[j+1]
+			ofs = word_start(command[k]);
+			params.descend(command, k, LISTARG);
+			command[k] = replace_static(command[k], [
+				LISTARG,
+				command[k].slice(),
+				deep_parse_list_arg(get_text(command[k]), special[j+1], ofs, params),
+				ofs
+			]);
+			params.ascend(command, k, LISTARG);
+
+		} else {
 			switch (special[j+1]) {
 				case SCRIPTARG:
 					ofs = word_start(command[k]);
@@ -500,20 +489,41 @@ function deep_parse(script_tok, params) {
 					]);
 					params.ascend(command, k, SUBSTARG);
 					break;
-
-				case SWITCHARG:
-					ofs = word_start(command[k]);
-					params.descend(command, k, SWITCHARG);
-					command[k] = replace_static(command[k], [
-						SWITCHARG,
-						command[k].slice(),
-						deep_parse_switch_args(get_text(command[k]), ofs, params),
-						ofs
-					]);
-					params.ascend(command, k, SWITCHARG);
-					break;
 			}
 		}
+	}
+}
+
+function deep_parse(script_tok, params) {
+	var commands=script_tok[1], command, i, j, parse_info, special,
+		cmd_text;
+
+	if (params === undefined) {
+		params = {};
+	}
+	if (params.oncommand === undefined) { params.oncommand = function(){}; }
+	if (params.descend === undefined) { params.descend = function(){}; }
+	if (params.ascend === undefined) { params.ascend = function(){}; }
+
+	for (i=0; i<commands.length; i++) {
+		command = commands[i];
+
+		// Scan for SCRIPT tokens to recurse into
+		for (j=0; j<command.length; j++) {
+			deep_parse_tokens(command[j], params);
+		}
+
+		cmd_text = get_text(command[0]);
+		parse_info = get_cmd_parse_info(params, cmd_text);
+		if (parse_info == null) {
+			params.oncommand(cmd_text, command);
+			continue;
+		}
+		special = typeof parse_info === 'function' ?
+			parse_info(command) : parse_info;
+
+		apply_specials(command, special, params);
+
 		params.oncommand(cmd_text, command);
 	}
 	return script_tok;
@@ -599,9 +609,7 @@ function reconstitute_word(word) {
 				script += reconstitute_word(token[1]);
 				break;
 			case parser.SUBSTARG:
-				script += reconstitute_word(token[2]);
-				break;
-			case parser.SWITCHARG:
+			case parser.LISTARG:
 				script += reconstitute_word(token[2]);
 				break;
 			default:

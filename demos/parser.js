@@ -153,12 +153,12 @@ function display_token(token, parent) {
 			]);
 			break;
 
-		case parser.SWITCHARG:
+		case parser.LISTARG:
 			node = dom.create('div', {}, parent, '['+tokname(type)+', ');
 			subnode = dom.create('div', {style: {marginLeft: '2em'}}, node);
-			for (i=0; i<token[2].length; i++) {
-				display_token(token[2][i], subnode);
-			}
+			for (i=0; i<token[2].length; i++)
+				for (j=0; j<token[2][i].length; i++)
+					display_token(token[2][i][j], subnode);
 			dom.appendText(node, [
 				markup_tok_element(token[3]), ']'
 			]);

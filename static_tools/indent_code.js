@@ -147,7 +147,7 @@ function link_command_tokens(commands, prevtoken) {
 					case parser.INDEX:
 						prevtoken = link_word_tokens(token[1], prevtoken)[1];
 						break;
-					case parser.SWITCHARG:
+					case parser.LISTARG:
 						// TODO
 						break;
 				}
@@ -163,7 +163,7 @@ function prev_n_tokens(t, n) {
 		switch (t[0]) {
 			case parser.SCRIPTARG:
 			case parser.EXPRARG:
-			case parser.SWITCHARG:
+			case parser.LISTARG:
 			case parser.SUBSTARG:
 				n++;
 				break;
@@ -181,7 +181,7 @@ function next_n_tokens(t, n) {
 		switch (t[0]) {
 			case parser.SCRIPTARG:
 			case parser.EXPRARG:
-			case parser.SWITCHARG:
+			case parser.LISTARG:
 			case parser.SUBSTARG:
 				n++;
 				break;
@@ -200,7 +200,7 @@ function print_tok(t) {
 		case parser.SCRIPTARG:
 		case parser.EXPRARG:
 		case parser.SUBSTARG:
-		case parser.SWITCHARG:
+		case parser.LISTARG:
 			str += ' <...>';
 			break;
 		case parser.OPERAND:
@@ -250,7 +250,7 @@ skip[parser.SPACE] = true;
 skip[parser.SCRIPTARG] = true;
 skip[parser.EXPRARG] = true;
 skip[parser.SUBSTARG] = true;
-skip[parser.SWITCHARG] = true;
+skip[parser.LISTARG] = true;
 function next_non_whitespace(t) {
 	while (t && skip.hasOwnProperty(t[0])) {
 		t = t.next;
@@ -307,10 +307,10 @@ function process_parse(commands, params) {
 						process_parse(token[2], params);
 						params.ascend(command, k, parser.EXPRARG);
 						break;
-					case parser.SWITCHARG:
-						params.descend(command, k, parser.SWITCHARG);
+					case parser.LISTARG:
+						params.descend(command, k, parser.LISTARG);
 						// TODO
-						params.ascend(command, k, parser.SWITCHARG);
+						params.ascend(command, k, parser.LISTARG);
 						break;
 				}
 			}
@@ -334,7 +334,7 @@ function tokchars(t) {
 		case parser.SCRIPTARG:
 		case parser.EXPRARG:
 		case parser.SUBSTARG:
-		case parser.SWITCHARG:
+		case parser.LISTARG:
 			return '';
 		case parser.OPERATOR:
 		case parser.OPERAND:
@@ -369,7 +369,7 @@ function indent(parsed) {
 			switch (type) {
 				case parser.SCRIPTARG:
 				case parser.EXPRARG:
-				case parser.SWITCHARG:
+				case parser.LISTARG:
 					break;
 				default:
 					return;
@@ -385,7 +385,7 @@ function indent(parsed) {
 			switch (type) {
 				case parser.SCRIPTARG:
 				case parser.EXPRARG:
-				case parser.SWITCHARG:
+				case parser.LISTARG:
 					break;
 				default:
 					return;

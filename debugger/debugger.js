@@ -321,10 +321,11 @@ function instrument(commands, scrid) {
 							if (token[2][l][0] === parser.SCRIPT)
 								token[2][l][1] = instrument(token[2][l][1], scrid);
 						break;
-					case parser.SWITCHARG:
+					case parser.LISTARG:
 						for (l=0; l<token[2].length; l++)
-							if (token[2][l][0] === parser.SCRIPT)
-								token[2][l][1] = instrument(token[2][l][1], scrid);
+							for (m=0; m<token[2][i].length; m++)
+								if (token[2][l][m][0] === parser.SCRIPT)
+									token[2][l][m][1] = instrument(token[2][l][m][1], scrid);
 						break;
 					case parser.END:
 						endtok = word.pop();
@@ -483,10 +484,10 @@ function display_token(token, scrid) {
 			}
 			break;
 
-		case parser.SWITCHARG:
-			for (i=0; i<token[2].length; i++) {
-				display_token(token[2][i], scrid);
-			}
+		case parser.LISTARG:
+			for (i=0; i<token[2].length; i++)
+				for (j=0; j<token[2][i].length; j++)
+					display_token(token[2][i][j], scrid);
 			break;
 
 		case parser.COMMENT:

@@ -302,6 +302,9 @@ function parse(text, mode, ofs) {
 			tokens = [];
 			while (true) {
 				switch (text[i]) {
+					case undefined:
+						throw new ParseError('missing )', i, text, ofs);
+
 					case ')':
 						emit_waiting(TEXT);
 						indextokens = tokens.slice(0);
@@ -682,6 +685,9 @@ function parse(text, mode, ofs) {
 			}
 
 			switch (text[i]) {
+				case undefined:
+					throw new ParseError('missing operand', i, text, ofs);
+
 				case '"': sub_parse(QUOTED, parse_quoted);		continue;
 				case '{': sub_parse(BRACED, parse_braced);		continue;
 				case '$':
@@ -803,7 +809,7 @@ function parse(text, mode, ofs) {
 
 					case '{':
 						depth++;
-						continue;
+						break;
 
 					case '}':
 						if (--depth === 0) {
@@ -814,7 +820,7 @@ function parse(text, mode, ofs) {
 							emit([SYNTAX, text[i++]]);
 							return tokens;
 						}
-						continue;
+						break;
 				}
 			} else if (is_whitespace(text[i])) {
 				emit_waiting(TEXT);

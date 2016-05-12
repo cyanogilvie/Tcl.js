@@ -430,8 +430,12 @@ function get_cmd_parse_info(params, cmd_text) {
 function apply_specials(command, special, params) {
 	var j, k, ofs, txt;
 
+	if (special == null) return;
+
 	for (j=0; j<special.length; j+=2) {
 		k = special[j];
+		if (command[k] == null) continue;
+
 		//console.warn(cmd_text+' k: '+k+', command.length: '+command.length);
 		txt = get_text(command[k], true);
 		if (txt == null) {
@@ -514,6 +518,8 @@ function deep_parse(script_tok, params) {
 		}
 
 		cmd_text = get_text(command[0]);
+		if (cmd_text == null) continue;
+
 		parse_info = get_cmd_parse_info(params, cmd_text);
 		if (parse_info == null) {
 			params.oncommand(cmd_text, command);

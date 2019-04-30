@@ -149,6 +149,21 @@ var iface,
 			}
 		}
 		return specials;
+	},
+	"dict": function(words){
+		var last=last_real_word_number(words);
+
+		switch get_text(words[1]) {
+			case 'filter':
+				if (get_text(words[3]) === 'script') return [5, SCRIPTARG];
+				break;
+
+			case 'for':
+			case 'map':
+			case 'update':
+			case 'with':
+				return [last, SCRIPTARG];
+		}
 	}
 };
 

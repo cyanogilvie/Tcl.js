@@ -22,6 +22,7 @@ interp alias {} parse_args {} ::parse_args::parse_args
 parse_args $args {
 	-callgraph	{-default callgraph}
 	-allprocs	{-default allprocs}
+	-ignore		{}
 }
 
 proc readfile fn {
@@ -31,6 +32,12 @@ proc readfile fn {
 
 set callgraph	[readfile $callgraph]
 
+if {[info exists ignore]} {
+	set ignored	[readfile $ignore]
+} else {
+	set ignored	{}
+}
+
 foreach line [split [string trim [readfile $allprocs]] \n] {
 	lassign $line proc file line_no ns
 	if {[string match ::* $proc] || [string match "themed *" $proc]} {
@@ -38,7 +45,7 @@ foreach line [split [string trim [readfile $allprocs]] \n] {
 	} else {
 		set fqproc	${ns}::$proc
 	}
-	if {![dict exists $callgraph $proc]} {
+	if {![dict exists $callgraph $proc] && $proc ni $ignored} {
 		puts [list $fqproc $file $line_no]
 	}
 }

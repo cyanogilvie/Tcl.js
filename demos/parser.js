@@ -132,23 +132,23 @@ function display_token(token, parent) {
 			break;
 
 		case parser.EXPRARG:
-			node = dom.create('div', {}, parent, '['+tokname(type)+', ');
+			node = dom.create('div', {}, parent, '['+tokname(type)+', <expr toks>, ');
 			subnode = dom.create('div', {style: {marginLeft: '2em'}}, node);
 			for (i=0; i<token[2].length; i++) {
 				display_expr_token(token[2][i], subnode);
 			}
-			dom.appendText(node, [
+			dom.appendText(node, [', ',
 				markup_tok_element(token[3]), ']'
 			]);
 			break;
 
 		case parser.SUBSTARG:
-			node = dom.create('div', {}, parent, '['+tokname(type)+', ');
+			node = dom.create('div', {}, parent, '['+tokname(type)+', <subst toks>, ');
 			subnode = dom.create('div', {style: {marginLeft: '2em'}}, node);
 			for (i=0; i<token[2].length; i++) {
 				display_token(token[2][i], subnode);
 			}
-			dom.appendText(node, [
+			dom.appendText(node, [', ',
 				markup_tok_element(token[3]), ']'
 			]);
 			break;
@@ -159,7 +159,7 @@ function display_token(token, parent) {
 			for (i=0; i<token[2].length; i++)
 				for (j=0; j<token[2][i].length; i++)
 					display_token(token[2][i][j], subnode);
-			dom.appendText(node, [
+			dom.appendText(node, [', ',
 				markup_tok_element(token[3]), ']'
 			]);
 			break;
@@ -175,7 +175,7 @@ function display_token(token, parent) {
 		case parser.ARRAY:
 		case parser.EXPAND:
 		case parser.ESCAPE:
-			dom.create('div', attribs, parent, [
+			node = dom.create('div', attribs, parent, [
 				'['+tokname(type)+', ',
 				markup_tok_element(token[1]), ', ',
 				markup_tok_element(token[2]), ', ',
@@ -186,6 +186,9 @@ function display_token(token, parent) {
 
 		default:
 			console.warn('Unhandled token type: '+type+', "'+parser[type]+'"');
+	}
+	if (token.meta !== undefined) {
+		dom.appendText(node, ['.meta = ', JSON.stringify(token.meta)]);
 	}
 }
 
@@ -312,6 +315,7 @@ function markup_tok_element(any) {
 function display_script_tokens(parsed) {
 	var node = dom.byId('tokens_display'),
 		marked_up_node = dom.byId('marked_up_display');
+
 	dom.empty(node);
 	dom.empty(marked_up_node);
 	if (parsed) {

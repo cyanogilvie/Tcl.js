@@ -180,7 +180,9 @@ function parse(text, mode, ofs) {
 
 	function emit(tok) {
 		tok[3] = tokstart;
-		tokstart += toklength(tok);
+		tok.meta = {
+		};
+		tokstart += (tok.meta.toklength = toklength(tok));
 		tokens.push(tok);
 		token = '';
 	}

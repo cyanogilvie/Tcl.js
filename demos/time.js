@@ -1,6 +1,4 @@
-/*global define, window */
-define(function(){
-'use strict';
+/*global window */
 
 var now = (function(){
 	// From https://gist.github.com/2993641
@@ -10,7 +8,7 @@ var now = (function(){
 	return fn ? fn.bind(perf) : function() { return new Date().getTime(); };
 })();
 
-return function(f, cb){
+export default function time(f, cb){
 	var before, after, res;
 
 	before = now();
@@ -19,4 +17,3 @@ return function(f, cb){
 	cb((after-before) * 1000);
 	return res;
 };
-});

@@ -25,7 +25,7 @@ proc readfile fn {
 }
 
 cflib::config create cfg $argv {
-	variable ignore_tree	{}
+	variable ignore_tree	{rl_page}
 }
 
 lassign [cfg rest] cmd callgraph_fn

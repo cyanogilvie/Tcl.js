@@ -1,25 +1,9 @@
 /*jshint eqnull:true */
-/*global require */
-require([
-	'tcl/parser',
-	'tcl/parser_utils',
-	'js/text!./examples/example1.tcl',
-	'js/text!./examples/example2.tcl',
-	'js/text!./examples/example3.tcl',
-	'dom',
-	'time',
 
-	'js/domReady!'
-], function(
-	parser,
-	parser_utils,
-	example1,
-	example2,
-	example3,
-	dom,
-	time
-){
-'use strict';
+import * as parser			from './tcl/parser.js';
+import * as parser_utils	from './tcl/parser_utils.js';
+import * as dom				from './dom.js';
+import time					from './time.js';
 
 var marked_up_parent,
 	tokname = parser_utils.tokname,
@@ -157,7 +141,7 @@ function display_token(token, parent) {
 			node = dom.create('div', {}, parent, '['+tokname(type)+', ');
 			subnode = dom.create('div', {style: {marginLeft: '2em'}}, node);
 			for (i=0; i<token[2].length; i++)
-				for (j=0; j<token[2][i].length; i++)
+				for (j=0; j<token[2][i].length; j++)
 					display_token(token[2][i][j], subnode);
 			dom.appendText(node, [', ',
 				markup_tok_element(token[3]), ']'
@@ -329,17 +313,22 @@ function load_script(script) {
 	parse_script();
 }
 
-function configure_noise(){
+function configure_noise() {
 	dom.innerText(dynStyleNode, dom.byId('hide_noise').checked ? '.noise {display: none;}' : '');
 }
 
-load_script(example1);
+function load_script_url(url) {
+	fetch(url)
+		.then(response => response.text())
+		.then(script => load_script(script));
+}
 
-dom.onclick('example1', function(){load_script(example1);});
-dom.onclick('example2', function(){load_script(example2);});
-dom.onclick('example3', function(){load_script(example3);});
+load_script_url('./examples/example1.tcl');
+
+dom.onclick('example1', function(){load_script_url('./examples/example1.tcl');});
+dom.onclick('example2', function(){load_script_url('./examples/example2.tcl');});
+dom.onclick('example3', function(){load_script_url('./examples/example3.tcl');});
 dom.onclick('parse_script_button', parse_script);
 dom.byId('hide_noise').onchange = configure_noise;
 dom.byId('deep_parse').onchange = parse_script;
 configure_noise();
-});

@@ -1,15 +1,6 @@
 /*jshint eqnull:true */
-/*global require */
-require([
-	'js/text!./dsl_scripts/annotate_entries.tcl',
-	'tcl/interp',
 
-	'js/domReady!'
-], function(
-	dsl_script,
-	Interp
-){
-'use strict';
+import Interp from './tcl/interp.js';
 
 var i, raw_entries, I=Interp();
 
@@ -66,21 +57,23 @@ function render_entries(cooked_entries) {
 	}
 }
 
-I.set_var('entries', raw_entries);
-I.TclEval(dsl_script, function(result){
-	switch (result.code) {
-		case I.types.OK:
-		case I.types.RETURN:
-			render_entries(result.result);
-			break;
-		case I.types.ERROR:
-			console.error('Error in DSL script: '+result.result);
-			break;
-		default:
-			// Will land here if the script ends in break, continue, return -code 12, etc
-			console.error('Unexpected return code from DSL script: '+result.code);
-	}
-});
-
-});
+fetch('./dsl_scripts/annotate_entries.tcl')
+	.then(response => response.text())
+	.then(dsl_script => {
+		I.set_var('entries', raw_entries);
+		I.TclEval(dsl_script, function(result){
+			switch (result.code) {
+				case I.types.OK:
+				case I.types.RETURN:
+					render_entries(result.result);
+					break;
+				case I.types.ERROR:
+					console.error('Error in DSL script: '+result.result);
+					break;
+				default:
+					// Will land here if the script ends in break, continue, return -code 12, etc
+					console.error('Unexpected return code from DSL script: '+result.code);
+			}
+		});
+	});
 

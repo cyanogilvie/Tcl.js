@@ -61,7 +61,7 @@ var ignore_cmds = {
 	'lindex': 0, 'lsort': 0, 'tclLog': 0, 'string': 0
 };
 
-fs.for_each_file(process.argv.slice(2), function(fn, err, source){
+fs.for_each_file(process.argv.slice(2), function(fn, err, rawsource){
 	var m, flags = {
 		ignore: false
 	};
@@ -70,6 +70,7 @@ fs.for_each_file(process.argv.slice(2), function(fn, err, source){
 		console.err(err);
 		return;
 	}
+	const source = rawsource.replace(/\x1A[^]*$/, '');	// Trim from EOF to end
 	if ((m = /#static:(.*?)\n/.exec(source))) {
 		parser_utils.process_flags(m[1], flags);
 	}
